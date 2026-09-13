@@ -1,0 +1,90 @@
+{
+  "_comment": [
+    "Paraphyletic grades. A grade is not a clade and must not be drawn as one, so",
+    "the app renders these as a bracket spanning a set of successive stem branches",
+    "rather than as a collapsible triangle.",
+    "",
+    "  members    resolved from fossils.json: any fossil listing this grade id.",
+    "  paraphyletic  true for a grade proper. A few entries here are clades whose",
+    "                *named* content is paraphyletic -- Theropoda is a clade, but",
+    "                'non-avian theropods' is what the fossils on that stem are.",
+    "  excludes   the living clade the grade is defined by excluding. This is what",
+    "             makes the paraphyly explicit rather than implied.",
+    "",
+    "Grades may nest: Dimetrodon is a pelycosaur, a non-mammalian synapsid, and",
+    "neither of those is a clade."
+  ],
+
+  "grades": [
+    { "id": "ostracoderms", "label": "\"ostracoderms\"", "paraphyletic": true,
+      "excludes": "Gnathostomata", "colour": "#7a8b99",
+      "note": "Armoured jawless stem gnathostomes. Not a clade: each of these lineages branches off the same stem at a different point, and Osteostraci is closer to you than it is to Pteraspidomorphi. The name survives because the animals look alike, which is exactly the trap." },
+
+    { "id": "placoderms", "label": "\"placoderms\"", "paraphyletic": true,
+      "excludes": "Gnathostomata", "colour": "#8a7b6b",
+      "note": "Armoured jawed fishes of the Silurian and Devonian. Read as a clade until Entelognathus turned up in 2013 with bony-fish jaw margins. Now generally a grade on the gnathostome stem, with different placoderms closer to different living groups. The placoderm-monophyly toggle restores the older arrangement." },
+
+    { "id": "acanthodians", "label": "\"acanthodians\"", "paraphyletic": true,
+      "excludes": "Chondrichthyes", "colour": "#6b7f8a",
+      "note": "\"Spiny sharks\", which were neither especially spiny by placoderm standards nor sharks. Braincase evidence from Acanthodes moved them onto the chondrichthyan stem as a grade." },
+
+    { "id": "palaeoniscoids", "label": "\"palaeoniscoids\"", "paraphyletic": true,
+      "excludes": "Actinopterygii", "colour": "#8a8264",
+      "note": "Early ray-finned fishes, grouped by retained ancestral characters and nothing else. A textbook wastebasket." },
+
+    { "id": "stem-tetrapods", "label": "stem tetrapods", "paraphyletic": true,
+      "excludes": "Tetrapoda", "colour": "#6f8a63",
+      "note": "The fish-tetrapod transition. Reading down this ladder from Eusthenopteron to Tulerpeton is reading the acquisition of limbs, necks and weight-bearing joints one branch at a time, in animals that were all still aquatic." },
+
+    { "id": "stem-amniotes", "label": "stem amniotes", "paraphyletic": true,
+      "excludes": "Amniota", "colour": "#5f8a72" },
+
+    { "id": "non-mammalian-synapsids", "label": "non-mammalian synapsids", "paraphyletic": true,
+      "excludes": "Mammalia", "colour": "#a07a5a",
+      "note": "Once called \"mammal-like reptiles\", which is wrong twice: they are not reptiles, and calling them mammal-like implies they are approximations of mammals rather than their own animals. Synapsida is a clade; the non-mammalian part of it is not." },
+
+    { "id": "pelycosaurs", "label": "\"pelycosaurs\"", "paraphyletic": true,
+      "excludes": "Therapsida", "colour": "#b08a63",
+      "note": "Early synapsids excluding therapsids. Dimetrodon is the one everyone can draw, and it is neither a dinosaur nor a reptile." },
+
+    { "id": "therapsids", "label": "non-mammalian therapsids", "paraphyletic": true,
+      "excludes": "Mammalia", "colour": "#9a7050" },
+
+    { "id": "cynodonts", "label": "non-mammalian cynodonts", "paraphyletic": true,
+      "excludes": "Mammalia", "colour": "#8d6446",
+      "note": "Where the jaw joint migrates and the middle ear is assembled out of the bones that used to hinge the jaw." },
+
+    { "id": "mammaliaforms", "label": "non-mammalian mammaliaforms", "paraphyletic": true,
+      "excludes": "Mammalia", "colour": "#7f5a3e" },
+
+    { "id": "stem-turtles", "label": "stem turtles", "paraphyletic": true,
+      "excludes": "Testudines", "colour": "#5c7f6a",
+      "note": "The shell assembles in stages: broadened ribs, then a plastron, then a carapace, then a retractable neck. Each stage is a separate branch." },
+
+    { "id": "pseudosuchians", "label": "non-crocodylian pseudosuchians", "paraphyletic": true,
+      "excludes": "Crocodylia", "colour": "#7a6f55",
+      "note": "The crocodile-line archosaurs. For most of the Triassic these, not dinosaurs, were the dominant large land vertebrates." },
+
+    { "id": "stem-crocodylians", "label": "stem crocodylians", "paraphyletic": true,
+      "excludes": "Crocodylia", "colour": "#6d6349" },
+
+    { "id": "non-avian-dinosaurs", "label": "non-avian dinosaurs", "paraphyletic": true,
+      "excludes": "Aves", "colour": "#8a6070",
+      "note": "Dinosauria is a clade and birds are in it. \"Non-avian dinosaurs\" is the grade you get by cutting the birds out, and it is the group that ends at the K-Pg boundary." },
+
+    { "id": "theropods", "label": "non-avian theropods", "paraphyletic": true,
+      "excludes": "Aves", "colour": "#96566a" },
+
+    { "id": "coelurosaurs", "label": "non-avian coelurosaurs", "paraphyletic": true,
+      "excludes": "Aves", "colour": "#a04f68",
+      "note": "Feathers, wishbones, brooding and hollow bones are all present down here, before flight and before birds." },
+
+    { "id": "stem-birds", "label": "stem birds (Avialae)", "paraphyletic": true,
+      "excludes": "Aves", "colour": "#b04a62",
+      "note": "From Archaeopteryx to Ichthyornis. Every one of these is a bird by most people's definition and none of them is a crown bird." },
+
+    { "id": "recently-extinct", "label": "extinct in historical time", "paraphyletic": true,
+      "excludes": null, "colour": "#c0392b", "category": true,
+      "note": "Not a grade at all, a flag. These lineages are scattered across the tree and every one of them was lost after written records began. Grouped so the pattern is visible in one click." }
+  ]
+}

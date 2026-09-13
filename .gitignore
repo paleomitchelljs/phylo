@@ -1,0 +1,7 @@
+# Raw phylogeny downloads: ~990 MB, rebuilt by build/fetch.sh
+trees/
+# Build intermediates
+build/cache/
+build/*.pyc
+__pycache__/
+.DS_Store

@@ -1,0 +1,579 @@
+{
+  "_comment": [
+    "Deep vertebrate backbone. None of the downloaded clade chronograms date these",
+    "splits, so the ages here are hand-entered from the literature and each node",
+    "carries its source. Ages are in Ma before present.",
+    "",
+    "Edit this file to change the backbone. build_payload.py reads it directly and",
+    "no code needs touching. Node ids are referenced by fossils.json, grades.json",
+    "and alternatives.json, so renaming an id means updating those too."
+  ],
+  "backbone": {
+    "id": "Vertebrata",
+    "label": "Vertebrata",
+    "age": 525,
+    "note": "Crown vertebrates: the cyclostome-gnathostome split. Estimates range widely (about 470-615 Ma). 525 Ma is chosen to sit just below the oldest uncontested stem vertebrates, Myllokunmingia and Haikouichthys at roughly 518 Ma.",
+    "refs": [
+      "Kumar & Hedges 1998",
+      "Irisarri et al. 2017 Nat Ecol Evol 1:1370"
+    ],
+    "children": [
+      {
+        "id": "Cyclostomata",
+        "label": "Cyclostomata",
+        "vernacular": "hagfishes and lampreys",
+        "age": 460,
+        "note": "Molecular data strongly support hagfish and lampreys as sister taxa. Morphology historically placed lampreys closer to jawed vertebrates. See the cyclostome-monophyly toggle.",
+        "refs": [
+          "Heimberg et al. 2010 PNAS 107:19379",
+          "Miyashita et al. 2019 PNAS 116:2146"
+        ]
+      },
+      {
+        "id": "Gnathostomata",
+        "label": "Gnathostomata",
+        "vernacular": "jawed vertebrates",
+        "age": 450,
+        "note": "Crown jawed vertebrates. Ordovician-Silurian teeth and spines (Qianodus, Fanjingshania, about 439 Ma) push the crown at least this far back.",
+        "refs": [
+          "Andreev et al. 2022 Nature 609:964",
+          "Zhu et al. 2022 Nature 609:954"
+        ],
+        "children": [
+          {
+            "id": "Chondrichthyes",
+            "label": "Chondrichthyes",
+            "vernacular": "sharks, rays and chimaeras",
+            "age": 349,
+            "note": "Crown age taken from the Stein et al. 2018 ten-calibration analysis. Stem chondrichthyans including the acanthodian grade extend back to the Silurian."
+          },
+          {
+            "id": "Osteichthyes",
+            "label": "Osteichthyes",
+            "vernacular": "bony fishes",
+            "age": 430,
+            "note": "Actinopterygii-Sarcopterygii split. Guiyu oneiros at about 425 Ma is an early crown osteichthyan.",
+            "refs": [
+              "Zhu et al. 2009 Nature 458:469"
+            ],
+            "children": [
+              {
+                "id": "Actinopterygii",
+                "label": "Actinopterygii",
+                "vernacular": "ray-finned fishes",
+                "age": 368,
+                "note": "Crown age from Rabosky et al. 2018."
+              },
+              {
+                "id": "Sarcopterygii",
+                "label": "Sarcopterygii",
+                "vernacular": "lobe-finned fishes and tetrapods",
+                "age": 420,
+                "note": "Coelacanths diverge first among living sarcopterygians under the default topology. See the lungfish-versus-coelacanth toggle.",
+                "children": [
+                  {
+                    "id": "Actinistia",
+                    "label": "Actinistia",
+                    "vernacular": "coelacanths",
+                    "age": 30,
+                    "note": "Two living species. Crown age is the Latimeria chalumnae / L. menadoensis split, roughly 30 Ma."
+                  },
+                  {
+                    "id": "Rhipidistia",
+                    "label": "Rhipidistia",
+                    "age": 410,
+                    "children": [
+                      {
+                        "id": "Dipnoi",
+                        "label": "Dipnoi",
+                        "vernacular": "lungfishes",
+                        "age": 280,
+                        "note": "Six living species in three genera. Crown age approximate."
+                      },
+                      {
+                        "id": "Tetrapoda",
+                        "label": "Tetrapoda",
+                        "vernacular": "tetrapods",
+                        "age": 352,
+                        "note": "Crown tetrapods: the lissamphibian-amniote split. The stem, which carries Tiktaalik, Acanthostega and the rest of the fish-tetrapod transition, is much older.",
+                        "refs": [
+                          "Marjanovic & Laurin 2007 Syst Biol 56:369"
+                        ],
+                        "children": [
+                          {
+                            "id": "Amphibia",
+                            "label": "Amphibia",
+                            "vernacular": "amphibians",
+                            "age": 315,
+                            "note": "Crown age from Jetz & Pyron 2018 after the Homo sapiens outgroup is dropped."
+                          },
+                          {
+                            "id": "Amniota",
+                            "label": "Amniota",
+                            "vernacular": "amniotes",
+                            "age": 325,
+                            "note": "Synapsid-sauropsid split. Upham et al. 2019 recover 319.5 Ma for mammal versus Anolis; 325 Ma is the conventional fossil-calibrated value.",
+                            "refs": [
+                              "Benton & Donoghue 2007 Mol Biol Evol 24:26"
+                            ],
+                            "children": [
+                              {
+                                "id": "Mammalia",
+                                "label": "Mammalia",
+                                "vernacular": "mammals",
+                                "age": 180,
+                                "note": "Crown age from Upham et al. 2019 after the Anolis outgroup is dropped. Stem synapsids, from Dimetrodon to Morganucodon, sit on the branch below."
+                              },
+                              {
+                                "id": "Sauropsida",
+                                "label": "Sauropsida",
+                                "vernacular": "reptiles including birds",
+                                "age": 280,
+                                "note": "Lepidosaur-archelosaur split.",
+                                "children": [
+                                  {
+                                    "id": "Lepidosauria",
+                                    "label": "Lepidosauria",
+                                    "age": 250,
+                                    "children": [
+                                      {
+                                        "id": "Rhynchocephalia",
+                                        "label": "Rhynchocephalia",
+                                        "vernacular": "tuatara",
+                                        "age": 0,
+                                        "note": "One living species, Sphenodon punctatus. Diverse through the Mesozoic."
+                                      },
+                                      {
+                                        "id": "Squamata",
+                                        "label": "Squamata",
+                                        "vernacular": "lizards and snakes",
+                                        "age": 213,
+                                        "note": "Crown age from Title et al. 2024."
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "id": "Archelosauria",
+                                    "label": "Archelosauria",
+                                    "age": 255,
+                                    "note": "Turtles plus archosaurs. This grouping is the single most-revised node in amniote phylogeny. See the turtle-placement toggle.",
+                                    "refs": [
+                                      "Crawford et al. 2015 Mol Phylogenet Evol 83:250",
+                                      "Chiari et al. 2012 BMC Biol 10:65"
+                                    ],
+                                    "children": [
+                                      {
+                                        "id": "Testudines",
+                                        "label": "Testudines",
+                                        "vernacular": "turtles",
+                                        "age": 210,
+                                        "note": "Crown age from Thomson et al. 2021 after outgroups are dropped."
+                                      },
+                                      {
+                                        "id": "Archosauria",
+                                        "label": "Archosauria",
+                                        "age": 247,
+                                        "children": [
+                                          {
+                                            "id": "Crocodylia",
+                                            "label": "Crocodylia",
+                                            "vernacular": "crocodilians",
+                                            "age": 95,
+                                            "note": "Hand-built from Oaks 2011 and Hekkala et al. 2021. This is the one living clade with no downloadable species-level dated tree; see trees/README.md."
+                                          },
+                                          {
+                                            "id": "Aves",
+                                            "label": "Aves",
+                                            "vernacular": "birds",
+                                            "age": 117,
+                                            "note": "Crown age from McTavish et al. 2025 (Aves 1.6)."
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "sources": [
+    {
+      "graftAt": "Cyclostomata",
+      "file": "cyclostomata/opentree_Cyclostomata_subtree.nwk",
+      "format": "newick",
+      "schematic": true,
+      "citation": "Open Tree of Life synthesis opentree16.1 (2025-12-20)",
+      "url": "https://tree.opentreeoflife.org/",
+      "note": "Topology only. Branch lengths are imposed by even spacing to the clade crown age and carry no information."
+    },
+    {
+      "graftAt": "Chondrichthyes",
+      "file": "chondrichthyes/10.cal.tree.nex",
+      "index": 0,
+      "dataOnly": "chondrichthyes/Chond.610sp.10Cal.500TreeSet.tre",
+      "citation": "Stein et al. 2018 Nat Ecol Evol 2:288",
+      "doi": "10.1038/s41559-017-0448-4",
+      "note": "Taxon-complete tree number 1 of 10,000. The 582 species absent from the 610-species molecular tree are placed by taxonomy."
+    },
+    {
+      "graftAt": "Actinopterygii",
+      "file": "actinopterygii/actinopt_full.trees",
+      "index": 0,
+      "dataOnly": "actinopterygii/actinopt_12k_treePL.tre",
+      "citation": "Rabosky et al. 2018 Nature 559:392",
+      "doi": "10.1038/s41586-018-0273-1",
+      "note": "All-taxon-assembled chronogram 1 of 100. Roughly 19,900 of the 31,516 tips have no sequence data and are placed by taxonomy."
+    },
+    {
+      "graftAt": "Amphibia",
+      "file": "amphibia/amph_shl_new_Consensus_7238.tre",
+      "dataOnly": "amphibia/amph_shl_new.tre",
+      "drop": [
+        "Homo_sapiens"
+      ],
+      "citation": "Jetz & Pyron 2018 Nat Ecol Evol 2:850",
+      "doi": "10.1038/s41559-018-0515-5"
+    },
+    {
+      "graftAt": "Squamata",
+      "file": "squamata/title2024_science/imputed_full/best-full-trees/squams-full-imputed-xx1.tre",
+      "dataOnly": "squamata/title2024_science/squamates_Title_Science2024_ultrametric_constrained.tre",
+      "citation": "Title et al. 2024 Science 383:918",
+      "doi": "10.1126/science.adh2449",
+      "note": "Imputed taxon-complete tree 1 of 100."
+    },
+    {
+      "graftAt": "Testudines",
+      "file": "testudines/thomson2021/bd.mcc.median_heights.tre",
+      "dropPattern": "^(Homo|Gallus|Alligator|Anolis|Crocodylus|Sphenodon)_",
+      "citation": "Thomson et al. 2021 PNAS 118:e2012215118",
+      "doi": "10.1073/pnas.2012215118",
+      "note": "279 of 357 living species. Not taxon-complete."
+    },
+    {
+      "graftAt": "Aves",
+      "file": "aves/mctavish2025_opentree_aves1.6/summary_dated_clements.nex",
+      "dataOnly": "aves/mctavish2025_opentree_aves1.6/phylo_only_clements_labels.tre",
+      "citation": "McTavish et al. 2025 PNAS 122:e2409658122",
+      "doi": "10.1073/pnas.2409658122",
+      "note": "Aves 1.6, Clements 2025 taxonomy. 1,564 tips are placed by taxon addition rather than by phylogenetic data."
+    },
+    {
+      "graftAt": "Mammalia",
+      "file": "mammalia/upham2019_vertlife/MamPhy_fullPosterior_BDvr_Completed_5911sp_topoCons_NDexp_MCC_v2_target.tre",
+      "dataOnly": "mammalia/upham2019_vertlife/MamPhy_fullPosterior_BDvr_DNAonly_4098sp_topoFree_NDexp_MCC_v2_target.tre",
+      "drop": [
+        "_Anolis_carolinensis",
+        "Anolis_carolinensis"
+      ],
+      "citation": "Upham et al. 2019 PLoS Biol 17:e3000494",
+      "doi": "10.1371/journal.pbio.3000494"
+    }
+  ],
+  "handBuilt": [
+    {
+      "graftAt": "Actinistia",
+      "citation": "Holder et al. 2005; Nikaido et al. 2011",
+      "newick": "(Latimeria_chalumnae:30,Latimeria_menadoensis:30);"
+    },
+    {
+      "graftAt": "Dipnoi",
+      "citation": "Criswell 2015; Brownstein et al. 2023",
+      "newick": "(Neoceratodus_forsteri:280,((Protopterus_aethiopicus:60,(Protopterus_dolloi:45,(Protopterus_annectens:30,Protopterus_amphibius:30):15):15):100,Lepidosiren_paradoxa:160):120);"
+    },
+    {
+      "graftAt": "Rhynchocephalia",
+      "citation": "Hay et al. 2010",
+      "newick": "Sphenodon_punctatus;"
+    },
+    {
+      "graftAt": "Crocodylia",
+      "citation": "Oaks 2011 Evolution 65:3285; Hekkala et al. 2021 Commun Biol 4:505",
+      "note": "Hand-built because no species-level dated crocodylian tree is downloadable. Topology follows Oaks 2011 with Gavialis + Tomistoma sister per the molecular consensus. Ages approximate.",
+      "newick": "((Gavialis_gangeticus:38,Tomistoma_schlegelii:38):57,((Crocodylus_niloticus:8,(Crocodylus_suchus:6,((Crocodylus_moreletii:4,(Crocodylus_acutus:3,Crocodylus_intermedius:3):1):1,(Crocodylus_rhombifer:4,(Crocodylus_porosus:3,(Crocodylus_siamensis:2,(Crocodylus_palustris:1.5,(Crocodylus_johnstoni:1,(Crocodylus_novaeguineae:0.7,Crocodylus_mindorensis:0.7):0.3):0.5):0.5):1):1):1):1):2):12,((Mecistops_cataphractus:6,Mecistops_leptorhynchus:6):14,(Osteolaemus_tetraspis:8,(Osteolaemus_osborni:5,Osteolaemus_afzelii:5):3):12):20):63,((Alligator_mississippiensis:35,Alligator_sinensis:35):36,((Caiman_crocodilus:8,(Caiman_yacare:5,Caiman_latirostris:5):3):12,(Melanosuchus_niger:14,(Paleosuchus_trigonatus:9,Paleosuchus_palpebrosus:9):5):6):51):24);"
+    }
+  ],
+  "namedClades": [
+    {
+      "label": "Placentalia",
+      "vernacular": "placental mammals",
+      "mrca": [
+        "Homo_sapiens",
+        "Loxodonta_africana",
+        "Dasypus_novemcinctus"
+      ]
+    },
+    {
+      "label": "Afrotheria",
+      "mrca": [
+        "Loxodonta_africana",
+        "Chrysochloris_asiatica",
+        "Orycteropus_afer"
+      ]
+    },
+    {
+      "label": "Xenarthra",
+      "vernacular": "sloths, anteaters, armadillos",
+      "mrca": [
+        "Dasypus_novemcinctus",
+        "Bradypus_variegatus",
+        "Myrmecophaga_tridactyla"
+      ]
+    },
+    {
+      "label": "Boreoeutheria",
+      "mrca": [
+        "Homo_sapiens",
+        "Mus_musculus",
+        "Canis_lupus",
+        "Bos_taurus"
+      ]
+    },
+    {
+      "label": "Euarchontoglires",
+      "mrca": [
+        "Homo_sapiens",
+        "Mus_musculus"
+      ]
+    },
+    {
+      "label": "Laurasiatheria",
+      "mrca": [
+        "Canis_lupus",
+        "Bos_taurus",
+        "Myotis_lucifugus"
+      ]
+    },
+    {
+      "label": "Marsupialia",
+      "vernacular": "marsupials",
+      "mrca": [
+        "Didelphis_virginiana",
+        "Phascolarctos_cinereus",
+        "Macropus_giganteus"
+      ]
+    },
+    {
+      "label": "Monotremata",
+      "vernacular": "egg-laying mammals",
+      "mrca": [
+        "Ornithorhynchus_anatinus",
+        "Tachyglossus_aculeatus"
+      ]
+    },
+    {
+      "label": "Palaeognathae",
+      "mrca": [
+        "Struthio_camelus",
+        "Tinamus_major"
+      ]
+    },
+    {
+      "label": "Neognathae",
+      "mrca": [
+        "Gallus_gallus",
+        "Passer_domesticus"
+      ]
+    },
+    {
+      "label": "Galloanserae",
+      "vernacular": "fowl and waterfowl",
+      "mrca": [
+        "Gallus_gallus",
+        "Anas_platyrhynchos"
+      ]
+    },
+    {
+      "label": "Neoaves",
+      "mrca": [
+        "Passer_domesticus",
+        "Columba_livia",
+        "Falco_peregrinus"
+      ]
+    },
+    {
+      "label": "Serpentes",
+      "vernacular": "snakes",
+      "mrca": [
+        "Python_regius",
+        "Crotalus_atrox",
+        "Natrix_natrix"
+      ]
+    },
+    {
+      "label": "Iguania",
+      "mrca": [
+        "Iguana_iguana",
+        "Anolis_carolinensis",
+        "Chamaeleo_chamaeleon"
+      ]
+    },
+    {
+      "label": "Gekkota",
+      "vernacular": "geckos",
+      "mrca": [
+        "Gekko_gecko",
+        "Hemidactylus_frenatus"
+      ]
+    },
+    {
+      "label": "Anguimorpha",
+      "mrca": [
+        "Varanus_komodoensis",
+        "Heloderma_suspectum",
+        "Anguis_fragilis"
+      ]
+    },
+    {
+      "label": "Toxicofera",
+      "mrca": [
+        "Python_regius",
+        "Iguana_iguana",
+        "Varanus_komodoensis"
+      ]
+    },
+    {
+      "label": "Batrachia",
+      "mrca": [
+        "Xenopus_laevis",
+        "Ambystoma_mexicanum"
+      ]
+    },
+    {
+      "label": "Anura",
+      "vernacular": "frogs",
+      "mrca": [
+        "Xenopus_laevis",
+        "Rana_temporaria",
+        "Bufo_bufo"
+      ]
+    },
+    {
+      "label": "Caudata",
+      "vernacular": "salamanders",
+      "mrca": [
+        "Ambystoma_mexicanum",
+        "Salamandra_salamandra",
+        "Cryptobranchus_alleganiensis"
+      ]
+    },
+    {
+      "label": "Gymnophiona",
+      "vernacular": "caecilians",
+      "mrca": [
+        "Ichthyophis_bannanicus",
+        "Typhlonectes_natans",
+        "Rhinatrema_bivittatum"
+      ]
+    },
+    {
+      "label": "Holocephali",
+      "vernacular": "chimaeras",
+      "mrca": [
+        "Callorhinchus_milii",
+        "Chimaera_monstrosa"
+      ]
+    },
+    {
+      "label": "Elasmobranchii",
+      "vernacular": "sharks and rays",
+      "mrca": [
+        "Carcharodon_carcharias",
+        "Raja_clavata"
+      ]
+    },
+    {
+      "label": "Batoidea",
+      "vernacular": "rays and skates",
+      "mrca": [
+        "Raja_clavata",
+        "Dasyatis_pastinaca",
+        "Torpedo_marmorata"
+      ]
+    },
+    {
+      "label": "Selachimorpha",
+      "vernacular": "sharks",
+      "mrca": [
+        "Carcharodon_carcharias",
+        "Squalus_acanthias"
+      ]
+    },
+    {
+      "label": "Cladistia",
+      "vernacular": "bichirs",
+      "mrca": [
+        "Polypterus_ornatipinnis",
+        "Erpetoichthys_calabaricus"
+      ]
+    },
+    {
+      "label": "Teleostei",
+      "mrca": [
+        "Danio_rerio",
+        "Gadus_morhua",
+        "Thunnus_thynnus"
+      ]
+    },
+    {
+      "label": "Acanthomorpha",
+      "vernacular": "spiny-rayed fishes",
+      "mrca": [
+        "Gasterosteus_aculeatus",
+        "Thunnus_thynnus",
+        "Oryzias_latipes"
+      ]
+    },
+    {
+      "label": "Cypriniformes",
+      "vernacular": "carps and minnows",
+      "mrca": [
+        "Danio_rerio",
+        "Cyprinus_carpio"
+      ]
+    },
+    {
+      "label": "Cryptodira",
+      "vernacular": "hidden-necked turtles",
+      "mrca": [
+        "Chelonia_mydas",
+        "Chelydra_serpentina",
+        "Testudo_graeca"
+      ]
+    },
+    {
+      "label": "Pleurodira",
+      "vernacular": "side-necked turtles",
+      "mrca": [
+        "Podocnemis_expansa",
+        "Chelodina_longicollis"
+      ]
+    },
+    {
+      "label": "Alligatoridae",
+      "mrca": [
+        "Alligator_mississippiensis",
+        "Caiman_crocodilus"
+      ]
+    },
+    {
+      "label": "Crocodylidae",
+      "mrca": [
+        "Crocodylus_niloticus",
+        "Osteolaemus_tetraspis"
+      ]
+    }
+  ]
+}

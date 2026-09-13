@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<title>Vertebrate Tree Explorer</title>
+<meta name="description" content="An interactive, time-calibrated tree of living and extinct vertebrates: 68,000 species, fossil lineages and paraphyletic grades, with the contested nodes switchable.">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div id="app" class="app">
+
+  <header class="topbar">
+    <button id="menuBtn" class="icon-btn" aria-label="Show controls" aria-expanded="false">&#9776;</button>
+    <h1>Vertebrate Tree Explorer</h1>
+    <p id="stats" class="stats" aria-live="polite"></p>
+    <div class="spacer"></div>
+    <div class="toolgroup" role="group" aria-label="View controls">
+      <button id="btnZoomOut" class="tool" title="Shorter rows">&minus;</button>
+      <button id="btnZoomIn" class="tool" title="Taller rows">+</button>
+      <button id="btnFitTime" class="tool" title="Show the whole time axis">Fit time</button>
+      <button id="btnReset" class="tool" title="Back to the starting view">Reset</button>
+    </div>
+  </header>
+
+  <aside id="sidebar" class="sidebar" aria-label="Controls">
+
+    <section class="panel">
+      <label class="field">
+        <span class="field-label">Find a species or clade</span>
+        <input id="search" type="search" placeholder="Tiktaalik, sperm whale, Colubridae&hellip;"
+               autocomplete="off" spellcheck="false">
+      </label>
+      <ul id="results" class="results" hidden></ul>
+    </section>
+
+    <section id="detail" class="panel detail" hidden></section>
+
+    <section class="panel">
+      <h2 class="panel-h">Contested nodes</h2>
+      <p class="panel-note">Switch a node and the tree rearranges. Ages are not
+        re-estimated under the alternative, so rearranged branches are drawn dashed.</p>
+      <div id="alternatives" class="alts"></div>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-h">Grades</h2>
+      <p class="panel-note">Paraphyletic groups &mdash; the ones that are not clades.
+        Tick one to mark its lineages in the gutter beside the tree.</p>
+      <div id="grades" class="grades"></div>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-h">Display</h2>
+      <label class="check"><input type="checkbox" id="optImputed" checked>
+        <span>Mark species placed by taxonomy</span></label>
+      <label class="check"><input type="checkbox" id="optExtinct" checked>
+        <span>Show extinct lineages</span></label>
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-h">Sources</h2>
+      <ul id="sources" class="sources"></ul>
+      <p class="panel-note" id="buildinfo"></p>
+    </section>
+
+  </aside>
+
+  <main class="stage">
+    <canvas id="canvas" tabindex="0" aria-label="Vertebrate phylogeny"></canvas>
+    <div id="tooltip" class="tooltip" hidden></div>
+    <div id="loading" class="loading">Loading the tree&hellip;</div>
+    <p class="hint" id="hint">Click a triangle to open it &middot; scroll to move &middot;
+      shift&#8209;scroll to zoom time</p>
+  </main>
+
+</div>
+
+<script type="module" src="js/app.js"></script>
+<noscript>
+  <p style="padding:2rem;font:16px system-ui">This explorer needs JavaScript.
+  The underlying trees and the build pipeline are in the repository.</p>
+</noscript>
+</body>
+</html>
