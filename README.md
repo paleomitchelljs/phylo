@@ -5,16 +5,21 @@ static site from GitHub Pages. 68,241 living species from eight published
 chronograms, 94 extinct lineages placed on stems, 19 paraphyletic grades, and 11
 contested nodes you can switch and watch the tree rearrange.
 
+Two pages: the explorer, and a classroom exercise that deals random species and
+scores the tree a student builds from them.
+
 ```
 docs/          the site. GitHub Pages serves this directory.
-  index.html
-  css/app.css
+  index.html         the explorer
+  build.html         the "build a tree" exercise
+  css/               app.css (shared palette), build.css
   js/          data loader, SPR engine, layout, canvas renderer, UI
   data/        tree.bin (2.9 MB) + meta.json (0.7 MB), both generated
 build/
   phylolib.py        Newick/NEXUS I/O and tree surgery, no dependencies
   build_payload.py   assembles the scaffold and writes docs/data/
   test_topology.mjs  validates the SPR engine against the real payload
+  test_treebuild.mjs validates the exercise's answer key
   scaffold/          the hand-authored content -- edit these, not the code
     backbone.json      deep vertebrate topology, ages, graft points
     fossils.json       extinct taxa with stratigraphic ranges
@@ -38,6 +43,7 @@ read `file://` URLs.
 ```sh
 python3 build/build_payload.py    # ~5 s, needs trees/ populated
 node build/test_topology.mjs      # validates every topology alternative
+node build/test_treebuild.mjs     # validates the exercise's answer key
 ```
 
 `build_payload.py` reads `build/scaffold/*.json` and the chronograms in
@@ -168,6 +174,35 @@ Measured in Chrome on the full payload, 133,208 nodes:
 The renderer culls against row spans precomputed by the layout, so the cost of a
 frame tracks what is on screen rather than what is open. Rendering is on demand;
 there is no animation loop.
+
+## The exercise
+
+`build.html` deals 3 to 20 random species and asks the student to group them
+into a tree. Three is the floor because one or two taxa have only one possible
+rooted tree, so there is nothing to get wrong.
+
+You join two cards to make a clade, and the clade is itself a card, so you keep
+joining until one tree is left. That constraint is the point: a tree is nested
+sets, and letting someone drag labels into a pleasing shape without it produces
+pictures they cannot defend. Click one card then another, or drag one onto the
+other; *ungroup* undoes a join.
+
+Taxa are drawn from any clade in the scope list, either spread across the group
+(one per major subclade, which is the easy case) or all from inside one small
+clade (which is not). Species with common names are preferred where they exist,
+and extinct lineages can be dealt in. Scoring prunes the reference tree to the
+dealt taxa and compares clade sets: how many published clades were recovered,
+the Robinson-Foulds distance, which named groups were missed, and which groups
+the student invented that the tree does not support.
+
+The pruning is the answer key, so `build/test_treebuild.mjs` checks it the hard
+way: for every three dealt taxa it compares the rooted triple from the pruned
+tree against the same triple computed on the full 133,000-node tree. 17,124
+triples across 60 deals currently agree. It also asserts that a deal returns the
+number of taxa asked for -- an earlier version silently dealt two species when
+asked for eight, because splitting from the root of the vertebrate tree hands
+you the fossil ladder first and those buckets were empty with fossils switched
+off.
 
 ## Licence and citation
 

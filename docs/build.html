@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<title>Build a Tree</title>
+<meta name="description" content="Deal a handful of vertebrate species, group them into a phylogeny, and score the result against the published tree.">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/build.css">
+</head>
+<body>
+
+<div class="app app-build">
+
+  <header class="topbar">
+    <h1>Build a Tree</h1>
+    <p class="stats" id="progress"></p>
+    <div class="spacer"></div>
+    <a class="tool" href="index.html">Open the explorer &rarr;</a>
+  </header>
+
+  <main class="build-main">
+
+    <section class="setup panel">
+      <div class="setup-row">
+        <label class="field inline">
+          <span class="field-label">Species</span>
+          <input type="range" id="count" min="3" max="20" value="8" step="1">
+          <output id="countOut">8</output>
+        </label>
+
+        <label class="field inline">
+          <span class="field-label">Drawn from</span>
+          <select id="scope"></select>
+        </label>
+
+        <label class="field inline">
+          <span class="field-label">Difficulty</span>
+          <select id="difficulty">
+            <option value="spread">Spread out &mdash; one per major group</option>
+            <option value="close">Close relatives &mdash; all from one clade</option>
+          </select>
+        </label>
+
+        <label class="check"><input type="checkbox" id="fossils">
+          <span>Include extinct lineages</span></label>
+
+        <button class="tool primary" id="deal">Deal new species</button>
+      </div>
+      <p class="panel-note">Three species is the smallest set with more than one
+        possible rooted tree, so that is where the slider starts.</p>
+    </section>
+
+    <section class="instructions panel" id="hintbar">
+      <p><strong>Join two things to make a clade.</strong> Click one card then
+        another, or drag one onto another. The new group is itself a card, so
+        keep joining until a single tree is left. <em>ungroup</em> undoes one
+        join.</p>
+    </section>
+
+    <div class="bench" id="bench" aria-label="Taxa to group"></div>
+
+    <div class="build-actions">
+      <button class="tool primary" id="check" disabled>Check my tree</button>
+      <button class="tool" id="reset">Start over with the same species</button>
+      <button class="tool" id="reveal">Show the answer</button>
+    </div>
+
+    <section class="results panel" id="results" hidden></section>
+
+  </main>
+
+  <div id="loading" class="loading">Loading the tree&hellip;</div>
+</div>
+
+<script type="module" src="js/build.js"></script>
+<noscript>
+  <p style="padding:2rem;font:16px system-ui">This exercise needs JavaScript.</p>
+</noscript>
+</body>
+</html>

@@ -31,6 +31,7 @@
   --ui-accent: #1b6ac9;
   --ui-accent-soft: #e6eefb;
   --shadow: 0 1px 2px rgba(20, 22, 26, .06), 0 6px 18px rgba(20, 22, 26, .06);
+  --correct: #2e7d44;
   --sidebar-w: 330px;
 }
 
@@ -63,6 +64,7 @@
     --ui-dim: #949aa3;
     --ui-accent: #66aaf0;
     --ui-accent-soft: #16283c;
+    --correct: #5ec27a;
     --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35);
   }
 }
