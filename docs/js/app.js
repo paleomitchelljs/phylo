@@ -123,7 +123,7 @@
       const cls = n.t ? 'tip' : n.ph ? 'ph' : '';
       const ring = o.sel === id ? `<circle class="ring" r="${n.ph ? 13 : 9}"/>` : '';
       if (n.ph) out.n.push(`<g class="nd ph${dim}" data-n="${id}" transform="translate(${a.x},${a.y})">${ring}<circle class="c" r="9"/><text>?</text></g>`);
-      else out.n.push(`<g class="nd ${cls} ${n.t ? '' : st}${dim}" data-n="${id}" transform="translate(${a.x},${a.y})">${ring}<circle class="c" r="${n.t ? 4 : 5}"/><circle r="${HIT / 2}" fill="transparent"/></g>`);
+      else out.n.push(`<g class="nd ${cls} ${n.t ? '' : st}${dim}" data-n="${id}" transform="translate(${a.x},${a.y})">${st === 'bad' && !n.t ? '<circle class="halo" r="12"/>' : ''}${ring}<circle class="c" r="${n.t ? 4 : 5}"/><circle r="${HIT / 2}" fill="transparent"/></g>`);
       if (a.root && o.interactive) out.n.push(`<g class="nd grip${dim}" data-n="${id}" transform="translate(${a.x},${a.y + STEM + 4})"><rect class="c" x="-9" y="-4" width="18" height="8" rx="4"/><title>move</title></g>`);
       if (n.t) {
         const ref = P.refByKey.get(n.t);

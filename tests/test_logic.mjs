@@ -148,5 +148,15 @@ for (let i = 0; i < 400; i++) {
   ok(S.roots.length === 1 && F.taxa(S, S.roots[0].id).length === 3, 'join onto own parent');
   ok(Object.keys(S.nodes).length === 5, 'nodes ' + Object.keys(S.nodes).length);
 }
+// grading by node, root up: (tuna,((frog,salamander),(lizard,caecilian))) -> 3/4, lizard+caecilian red
+{
+  const keys = ['tuna', 'leopard_frog', 'tiger_salamander', 'anole', 'caeciliidae'];
+  const S = P.emptyState(keys);
+  const [tu, fr, sa, li, ca] = keys.map(k => F.addTip(S, k, 0, 0));
+  const bat = F.join(S, sa, fr), lc = F.join(S, ca, li), tet = F.join(S, lc, bat), root = F.join(S, tet, tu);
+  const r = P.score(S);
+  ok(r.nodesOk === 3 && r.nodesNeed === 4, `example ${r.nodesOk}/${r.nodesNeed}`);
+  ok(r.node[root] === 'ok' && r.node[tet] === 'ok' && r.node[bat] === 'ok' && r.node[lc] === 'bad', 'example ' + JSON.stringify(r.node));
+}
 console.log(fails ? fails + ' failures' : 'all ok');
 process.exit(fails ? 1 : 0);

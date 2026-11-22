@@ -147,3 +147,4 @@ aside.drop { outline: 2px dashed var(--bad); outline-offset: -4px; }
 }
 #ans .nl { font-size: 10px; stroke-width: 3px; }
 #ans .tl { font-size: 11px; }
+.nd .halo { fill: var(--bad); fill-opacity: .2; stroke: var(--bad); stroke-width: 1.5; }
