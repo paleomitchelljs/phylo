@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <title>Build a Tree</title>
-<meta name="description" content="Deal a handful of vertebrate species, group them into a phylogeny, and score the result against the published tree.">
+<meta name="description" content="Deal vertebrate species, group them into a phylogeny, score the result.">
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/build.css">
 </head>
@@ -16,7 +16,7 @@
     <h1>Build a Tree</h1>
     <p class="stats" id="progress"></p>
     <div class="spacer"></div>
-    <a class="tool" href="index.html">Open the explorer &rarr;</a>
+    <a class="tool" href="index.html">Explorer &rarr;</a>
   </header>
 
   <main class="build-main">
@@ -37,33 +37,30 @@
         <label class="field inline">
           <span class="field-label">Difficulty</span>
           <select id="difficulty">
-            <option value="spread">Spread out &mdash; one per major group</option>
-            <option value="close">Close relatives &mdash; all from one clade</option>
+            <option value="spread">Spread out</option>
+            <option value="close">Close relatives</option>
           </select>
         </label>
 
         <label class="check"><input type="checkbox" id="fossils">
-          <span>Include extinct lineages</span></label>
+          <span>Include fossils</span></label>
 
-        <button class="tool primary" id="deal">Deal new species</button>
+        <button class="tool primary" id="deal">Deal</button>
       </div>
-      <p class="panel-note">Three species is the smallest set with more than one
-        possible rooted tree, so that is where the slider starts.</p>
     </section>
 
     <section class="instructions panel" id="hintbar">
-      <p><strong>Join two things to make a clade.</strong> Click one card then
-        another, or drag one onto another. The new group is itself a card, so
-        keep joining until a single tree is left. <em>ungroup</em> undoes one
-        join.</p>
+      <p><strong>Join two cards to make a clade.</strong> Click one then the
+        other, or drag one onto the other. Keep going until one tree is left.
+        <em>ungroup</em> undoes a join.</p>
     </section>
 
     <div class="bench" id="bench" aria-label="Taxa to group"></div>
 
     <div class="build-actions">
-      <button class="tool primary" id="check" disabled>Check my tree</button>
-      <button class="tool" id="reset">Start over with the same species</button>
-      <button class="tool" id="reveal">Show the answer</button>
+      <button class="tool primary" id="check" disabled>Check</button>
+      <button class="tool" id="reset">Start over</button>
+      <button class="tool" id="reveal">Show answer</button>
     </div>
 
     <section class="results panel" id="results" hidden></section>

@@ -1,625 +1,662 @@
-// UI wiring: events, panels, URL state.
+/* UI: canvas, dragging, panels. */
+(function (P) {
+  'use strict';
+  const F = P.F;
+  const $ = s => document.querySelector(s);
+  const NS = 'http://www.w3.org/2000/svg';
+  const GAP = 34, LEV = 34, STEM = 26, HIT = 24;
+  const COLORS = ['#d1495b', '#00798c', '#e09f1f', '#6a4c93', '#30638e', '#e07a5f', '#3d9970', '#b56576', '#8d6a1f', '#1b998b', '#c2185b', '#5d7f2a'];
+  const KEY = 'tree365.v1';
 
-import { loadTree, buildSearchIndex, FLAG_EXTINCT, FLAG_IMPUTED } from './data.js';
-import { applyAlternatives, isModified } from './topology.js';
-import { layout, expand, collapseNode, revealPath, visibleAncestor } from './layout.js';
-import { Renderer } from './render.js';
+  const A = {
+    S: null, undo: [], redo: [],
+    view: { x: 0, y: 0, k: 1 },
+    sel: null, brush: null, check: false, answer: false, variant: 0,
+    style: 'square', drag: null, deckName: '',
+  };
 
-const $ = (id) => document.getElementById(id);
+  /* ── state & history ───────────────────────────────────────────── */
 
-const state = {
-  tree: null,
-  search: null,
-  renderer: null,
-  collapsed: new Set(),
-  defaultCollapsed: new Set(),
-  selection: {},          // alternative id -> option id
-  common: new Map(),
-  lay: null,
-  needsLayout: true,
-  needsDraw: true,
-  hideExtinct: false,
-};
-
-// Clades collapsed on first load. Anything with its own published source tree
-// starts shut, so the opening view is the backbone plus the fossil record.
-const START_CLOSED = ['Cyclostomata', 'Chondrichthyes', 'Actinopterygii', 'Actinistia',
-  'Dipnoi', 'Amphibia', 'Mammalia', 'Squamata', 'Testudines', 'Crocodylia', 'Aves'];
-
-boot();
-
-async function boot() {
-  try {
-    const tree = await loadTree('data/');
-    state.tree = tree;
-    tree.recompute();
-    state.search = buildSearchIndex(tree);
-    const cn = tree.meta.commonNames || [];
-    state.common = new Map();
-    for (let i = 0; i < cn.length; i += 2) state.common.set(cn[i], cn[i + 1]);
-
-    const byId = new Map(tree.meta.clades.map((c) => [c.id, c.node]));
-    for (const id of START_CLOSED) {
-      const n = byId.get(id);
-      if (n !== undefined && !tree.isTip(n)) state.defaultCollapsed.add(n);
-    }
-    state.collapsed = new Set(state.defaultCollapsed);
-
-    state.renderer = new Renderer($('canvas'), tree);
-    buildAlternatives();
-    buildGrades();
-    buildLegend();
-    buildSources();
-    readUrl();
-
-    // Handy from the console, and the only way to profile the hot paths.
-    window.__vt = { state, layout, Renderer, applyAlternatives };
-
-    $('loading').hidden = true;
-    wireEvents();
-    updateStats();
-    invalidate(true);
-    // A hidden tab pauses rAF, so repaint when it comes back.
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) invalidate(false);
-    });
-  } catch (err) {
-    const el = $('loading');
-    el.className = 'loading error';
-    el.textContent = `Could not load the tree: ${err.message}. `
-      + 'If you opened this file directly, serve the folder over HTTP instead '
-      + '(python3 -m http.server) -- fetch() cannot read file:// URLs.';
-    console.error(err);
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify({ S: A.S, view: A.view, style: A.style, check: A.check })); } catch (e) { /* storage off */ }
   }
-}
-
-// --------------------------------------------------------------------------
-// Frame loop
-// --------------------------------------------------------------------------
-
-let frameQueued = false;
-
-function invalidate(structural) {
-  if (structural) state.needsLayout = true;
-  state.needsDraw = true;
-  // Render on demand rather than spinning a frame loop forever. Nothing here
-  // animates, so a permanently scheduled rAF would only burn battery.
-  if (!frameQueued) { frameQueued = true; requestAnimationFrame(frame); }
-}
-
-function frame() {
-  frameQueued = false;
-  const r = state.renderer;
-  if (state.needsLayout) {
-    state.lay = layout(state.tree, state.collapsed, state);
-    state.needsLayout = false;
-    r.view.scrollY = Math.min(r.view.scrollY, r.maxScroll(state.lay.nRows));
-  }
-  if (state.needsDraw) {
-    r.draw(state.lay, state.collapsed);
-    state.needsDraw = false;
-  }
-}
-
-// --------------------------------------------------------------------------
-// Events
-// --------------------------------------------------------------------------
-
-function wireEvents() {
-  const canvas = $('canvas');
-  const r = state.renderer;
-
-  new ResizeObserver(() => { r.resize(); invalidate(false); }).observe($('canvas').parentElement);
-
-  canvas.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    if (e.shiftKey) {
-      zoomTime(e.offsetX, e.deltaY > 0 ? 1.12 : 1 / 1.12);
-    } else if (e.ctrlKey || e.metaKey) {
-      setRowHeight(r.view.rowH * (e.deltaY > 0 ? 0.9 : 1.1));
-    } else {
-      r.view.scrollY = clamp(r.view.scrollY + e.deltaY, 0, r.maxScroll(state.lay.nRows));
-      invalidate(false);
-    }
-  }, { passive: false });
-
-  let drag = null;
-  canvas.addEventListener('pointerdown', (e) => {
-    canvas.setPointerCapture(e.pointerId);
-    drag = { x: e.offsetX, y: e.offsetY, sy: r.view.scrollY,
-             tMax: r.view.tMax, tMin: r.view.tMin, moved: false };
-  });
-  canvas.addEventListener('pointermove', (e) => {
-    if (drag) {
-      const dy = e.offsetY - drag.y, dx = e.offsetX - drag.x;
-      if (Math.abs(dx) + Math.abs(dy) > 3) { drag.moved = true; canvas.classList.add('grabbing'); }
-      r.view.scrollY = clamp(drag.sy - dy, 0, r.maxScroll(state.lay.nRows));
-      const perPx = (drag.tMax - drag.tMin) / r.plotW;
-      let tMax = drag.tMax + dx * perPx, tMin = drag.tMin + dx * perPx;
-      if (tMin < 0) { tMax -= tMin; tMin = 0; }
-      if (tMax > state.tree.meta.rootAge * 1.02) {
-        const over = tMax - state.tree.meta.rootAge * 1.02;
-        tMax -= over; tMin = Math.max(0, tMin - over);
+  function load() {
+    try {
+      const d = JSON.parse(localStorage.getItem(KEY));
+      if (d && d.S && d.S.deck.every(k => P.refByKey.has(k))) {
+        A.S = d.S; A.view = d.view || A.view; A.style = d.style || A.style; A.check = !!d.check;
+        return true;
       }
-      r.view.tMax = tMax; r.view.tMin = tMin;
-      invalidate(false);
+    } catch (e) { /* ignore */ }
+    return false;
+  }
+  function commit(fn) {
+    const before = JSON.stringify(A.S);
+    const r = fn(A.S);
+    if (JSON.stringify(A.S) === before) return r;
+    A.undo.push(before); if (A.undo.length > 200) A.undo.shift();
+    A.redo = [];
+    if (A.sel && !A.S.nodes[A.sel]) A.sel = null;
+    save(); render();
+    return r;
+  }
+  function undo() { if (!A.undo.length) return; A.redo.push(JSON.stringify(A.S)); A.S = JSON.parse(A.undo.pop()); afterHistory(); }
+  function redo() { if (!A.redo.length) return; A.undo.push(JSON.stringify(A.S)); A.S = JSON.parse(A.redo.pop()); afterHistory(); }
+  function afterHistory() { if (A.sel && !A.S.nodes[A.sel]) A.sel = null; save(); renderAll(); }
+
+  /* ── layout ────────────────────────────────────────────────────── */
+
+  function height(N, id) { const n = N[id]; return n.k.length ? 1 + Math.max(...n.k.map(c => height(N, c))) : 0; }
+
+  /* positions for the subtree at id with its root at (rx, ry); tips up */
+  function layout(N, id, rx, ry, pos) {
+    pos = pos || {};
+    const H = height(N, id);
+    let leaf = 0;
+    const local = {};
+    (function walk(x, d) {
+      const n = N[x];
+      if (!n.k.length) local[x] = { x: leaf++ * GAP };
+      else { n.k.forEach(c => walk(c, d + 1)); local[x] = { x: (local[n.k[0]].x + local[n.k[n.k.length - 1]].x) / 2 }; }
+      local[x].h = height(N, x);
+    })(id, 0);
+    const dx = rx - local[id].x;
+    (function place(x, par) {
+      const n = N[x];
+      pos[x] = { x: local[x].x + dx, y: ry - (H - local[x].h) * LEV, p: par };
+      n.k.forEach(c => place(c, x));
+    })(id, null);
+    pos[id].root = true;
+    pos[id].w = (leaf - 1) * GAP;
+    return pos;
+  }
+  function layoutAll(M) {
+    const pos = {};
+    for (const r of M.roots) layout(M.nodes, r.id, r.x, r.y, pos);
+    return pos;
+  }
+
+  /* ── drawing ───────────────────────────────────────────────────── */
+
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const traitColor = id => { const t = P.traitById.get(id); if (t) return COLORS[t.i % COLORS.length]; const i = A.S.custom.findIndex(c => c.id === id); return COLORS[(P.TRAITS.length + i * 5) % COLORS.length]; };
+
+  function branchPath(a, b, style) {   // a = node, b = parent (or null for root stem)
+    if (!b) return `M${a.x} ${a.y}V${a.y + STEM}`;
+    return style === 'slant' ? `M${a.x} ${a.y}L${b.x} ${b.y}` : `M${a.x} ${a.y}V${b.y}H${b.x}`;
+  }
+  function branchPoint(a, b, t, style) {
+    if (!b) return { x: a.x, y: a.y + 6 + t * (STEM - 10) };
+    if (style === 'slant') return { x: a.x + (b.x - a.x) * (0.2 + t * 0.6), y: a.y + (b.y - a.y) * (0.2 + t * 0.6) };
+    const top = a.y + 16, bot = b.y - 5;
+    return { x: a.x, y: top + (Math.max(bot, top) - top) * t };
+  }
+
+  function tipName(key) {
+    const n = P.refByKey.get(key);
+    return n ? n.name + (n.fossil ? ' †' : '') : key;
+  }
+
+  /* Draw a forest model. o: { pos, check, paint, marks, sel, dim:Set, interactive } */
+  function drawForest(M, o) {
+    const pos = o.pos, N = M.nodes, out = { e: [], h: [], m: [], n: [], l: [] };
+    for (const id in pos) {
+      const a = pos[id], b = a.p ? pos[a.p] : null, n = N[id];
+      const dim = o.dim && o.dim.has(id) ? ' dim' : '';
+      const painted = o.paint && o.paint[id];
+      const col = painted ? ` style="stroke:${o.paintColor};stroke-width:3.2"` : '';
+      out.e.push(`<path class="e${dim}" d="${branchPath(a, b, o.style)}"${col}/>`);
+      if (o.interactive) out.h.push(`<path class="hit" data-b="${id}" d="${branchPath(a, b, o.style)}"/>`);
+      // trait marks on this branch
+      const here = [];
+      for (const t in o.marks) for (const m of o.marks[t]) if (m.n === id) here.push([t, m]);
+      here.forEach(([t, m], i) => {
+        const p = branchPoint(a, b, here.length === 1 ? 0.5 : i / (here.length - 1), o.style);
+        const st = o.check && o.check.mark[t] ? o.check.mark[t][id] || '' : '';
+        const c = traitColor(t);
+        const name = (P.traitById.get(t) || A.S.custom.find(x => x.id === t) || { name: t }).name;
+        const on = o.brush === t ? ' style="stroke-width:2.5"' : '';
+        out.m.push(`<rect class="mk${m.loss ? ' loss' : ''} ${st}" data-b="${id}" x="${p.x - 8}" y="${p.y - 2.5}" width="16" height="5" rx="1.5" fill="${c}" stroke="${c}"${on}><title>${esc(name)}${m.loss ? ' (lost)' : ''}</title></rect>`);
+      });
+      // node
+      const st = o.check ? (o.check.node[id] || '') : '';
+      const cls = n.t ? 'tip' : n.ph ? 'ph' : '';
+      const ring = o.sel === id ? `<circle class="ring" r="${n.ph ? 13 : 9}"/>` : '';
+      if (n.ph) out.n.push(`<g class="nd ph${dim}" data-n="${id}" transform="translate(${a.x},${a.y})">${ring}<circle class="c" r="9"/><text>?</text></g>`);
+      else out.n.push(`<g class="nd ${cls} ${n.t ? '' : st}${dim}" data-n="${id}" transform="translate(${a.x},${a.y})">${ring}<circle class="c" r="${n.t ? 4 : 5}"/><circle r="${HIT / 2}" fill="transparent"/></g>`);
+      if (a.root && o.interactive) out.n.push(`<g class="nd grip${dim}" data-n="${id}" transform="translate(${a.x},${a.y + STEM + 4})"><rect class="c" x="-9" y="-4" width="18" height="8" rx="4"/><title>move</title></g>`);
+      if (n.t) {
+        const ref = P.refByKey.get(n.t);
+        out.l.push(`<text class="tl${ref && ref.fossil ? ' fos' : ''}${dim}" data-n="${id}" transform="translate(${a.x + 3},${a.y - 9}) rotate(-60)">${esc(tipName(n.t))}${ref && ref.sub && !ref.org ? `<title>${esc(ref.sub)}</title>` : ''}</text>`);
+      }
+      if (n.lab) {
+        const ls = o.check ? (o.check.label[id] || '') : '';
+        const ly = n.t ? a.y + 22 : a.y + 15;
+        out.l.push(`<text class="nl ${ls}${dim}" data-l="${id}" x="${a.x + 7}" y="${ly}">${esc(n.lab)}</text>`);
+      }
+    }
+    return out.e.join('') + out.h.join('') + out.m.join('') + out.n.join('') + out.l.join('');
+  }
+
+  function paintMap(M, marks) {
+    const map = {};
+    if (!marks) return map;
+    (function w(ids, st) { for (const id of ids) { const m = marks.find(x => x.n === id); const s = m ? !m.loss : st; map[id] = s; w(M.nodes[id].k, s); } })(M.roots.map(r => r.id), false);
+    return map;
+  }
+
+  let POS = {}, SCORE = null;
+  const world = $('#world'), cv = $('#cv');
+
+  function render() {
+    const S = A.S;
+    POS = layoutAll(S);
+    SCORE = A.check ? P.score(S) : null;
+    const d = A.drag;
+    const dim = d && d.kind === 'node' && d.moved ? new Set(F.sub(S, d.id)) : null;
+    let html = drawForest(S, {
+      pos: POS, check: SCORE, marks: S.marks, sel: A.sel, dim, interactive: true, style: A.style, brush: A.brush,
+      paint: A.brush ? paintMap(S, S.marks[A.brush] || []) : null, paintColor: A.brush && traitColor(A.brush),
+    });
+    if (d && d.moved && d.over) {
+      if (d.target) {
+        const t = POS[d.target.id];
+        html += `<circle class="target ${d.target.mode}" cx="${t.x}" cy="${t.y}" r="${d.target.mode === 'fill' ? 13 : 11}"/>`;
+      }
+      const g = ghostModel(d);
+      if (g) html += `<g class="ghost">${drawForest(g, { pos: layoutAll(g), marks: {}, style: A.style })}</g>`;
+    }
+    world.innerHTML = html;
+    world.setAttribute('transform', `translate(${A.view.x},${A.view.y}) scale(${A.view.k})`);
+    $('#empty').hidden = S.roots.length > 0;
+    renderTools(); renderScore();
+    if (A.answer) renderAnswer();
+  }
+  function renderAll() { renderDeck(); renderChips(); renderTraits(); render(); }
+
+  function ghostModel(d) {
+    const S = A.S, w = d.world;
+    if (d.kind === 'chip') return { nodes: { g: { id: 'g', k: [], t: d.key, lab: '' } }, roots: [{ id: 'g', x: w.x, y: w.y }] };
+    const nodes = {};
+    for (const id of F.sub(S, d.id)) nodes[id] = S.nodes[id];
+    return { nodes, roots: [{ id: d.id, x: w.x + d.off.x, y: w.y + d.off.y }] };
+  }
+
+  /* ── side panels ───────────────────────────────────────────────── */
+
+  const refOrder = new Map(); { let i = 0; (function w(n) { refOrder.set(n.key, i++); n.k.forEach(w); })(P.ref); }
+
+  function renderDeck() {
+    const sel = $('#deck');
+    const known = P.DECKS.find(d => d.id === A.S.deckId);
+    sel.innerHTML = P.DECKS.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('') +
+      `<option value="_custom"${known ? '' : ' selected'}>${known ? 'Custom' : esc(A.S.deckName || 'Custom')}</option>`;
+    if (known) sel.value = known.id;
+  }
+
+  function renderChips() {
+    const placed = new Set(F.placed(A.S));
+    const left = A.S.deck.filter(k => !placed.has(k)).sort((a, b) => refOrder.get(a) - refOrder.get(b));
+    $('#chips').innerHTML = left.map(k => {
+      const n = P.refByKey.get(k);
+      return `<div class="chip${n.org ? '' : ' grp'}" data-k="${k}" title="${esc(n.sub || '')}">${esc(tipName(k))}<span class="x" data-x="${k}">×</span></div>`;
+    }).join('');
+  }
+
+  function traitList() {
+    const app = P.applicableTraits(A.S.deck);
+    const used = Object.keys(A.S.marks).filter(t => A.S.marks[t].length);
+    const all = app.slice();
+    for (const t of used) if (P.traitById.has(t) && !all.includes(P.traitById.get(t))) all.push(P.traitById.get(t));
+    return all.concat(A.S.custom);
+  }
+
+  function renderTraits() {
+    const f = $('#tfilter').value.trim().toLowerCase();
+    const rows = traitList().filter(t => !f || t.name.toLowerCase().includes(f));
+    $('#tlist').innerHTML = rows.map(t => {
+      const n = (A.S.marks[t.id] || []).length;
+      const st = SCORE && SCORE.mark[t.id] ? Object.values(SCORE.mark[t.id]) : null;
+      const dot = st ? `<span class="st" style="background:var(--${st.every(s => s === 'ok') ? 'ok' : st.includes('bad') ? 'bad' : 'meh'})"></span>` : '';
+      return `<div class="trait${A.brush === t.id ? ' on' : ''}" data-t="${t.id}"><span class="sw" style="background:${traitColor(t.id)}"></span><span class="n">${esc(t.name)}</span>${dot}<span class="c">${n || ''}</span></div>`;
+    }).join('');
+    cv.classList.toggle('paint', !!A.brush);
+  }
+
+  function renderScore() {
+    const el = $('#score');
+    if (!SCORE) { el.innerHTML = ''; return; }
+    const s = SCORE;
+    const bits = [`<span class="s" title="nodes"><i>⑂</i><b>${s.nodesOk}</b>/${s.nodesNeed}</span>`];
+    if (s.labelsAll) bits.push(`<span class="s" title="names"><i>Aa</i><b>${s.labelsOk}</b>/${s.labelsAll}</span>`);
+    if (s.traitsNeed) bits.push(`<span class="s" title="traits"><i>▮</i><b>${s.traitsOk}</b>/${s.traitsNeed}</span>`);
+    el.innerHTML = bits.join('');
+    renderTraitDots();
+  }
+  function renderTraitDots() {
+    for (const row of document.querySelectorAll('.trait')) {
+      const t = row.dataset.t, old = row.querySelector('.st');
+      if (old) old.remove();
+      const st = SCORE && SCORE.mark[t] ? Object.values(SCORE.mark[t]) : null;
+      if (!st) continue;
+      const dot = document.createElement('span');
+      dot.className = 'st';
+      dot.style.background = `var(--${st.every(x => x === 'ok') ? 'ok' : st.includes('bad') ? 'bad' : 'meh'})`;
+      row.insertBefore(dot, row.querySelector('.c'));
+    }
+  }
+
+  /* ── answer panel ──────────────────────────────────────────────── */
+
+  function renderAnswer() {
+    const V = P.variants[A.variant] || P.ref;
+    if (!A.S.deck.length) { $('#ans').innerHTML = ''; $('#alts').innerHTML = ''; return; }
+    const { root, R } = P.answerTree(A.S.deck, V);
+    const M = { nodes: {}, roots: [] }, sigId = {};
+    let i = 0;
+    (function conv(c, p) {
+      const id = 'a' + (i++);
+      sigId[c.sig] = id;
+      M.nodes[id] = { id, p, t: c.t || null, k: [], lab: c.lab };
+      M.nodes[id].k = c.k.map(x => conv(x, id));
+      return id;
+    })(root, null);
+    M.roots.push({ id: 'a0', x: 0, y: 0 });
+    let marks = {}, paint = null;
+    if (A.brush && P.traitById.has(A.brush)) {
+      const ev = [...P.refTraitEvents(P.traitById.get(A.brush), R)];
+      marks[A.brush] = ev.map(code => ({ n: sigId[code.slice(0, -1)], loss: code.endsWith('-') })).filter(m => m.n);
+      paint = paintMap(M, marks[A.brush]);
+    }
+    const pos = layoutAll(M);
+    const svg = $('#ans');
+    svg.innerHTML = `<g>${drawForest(M, { pos, marks, paint, paintColor: A.brush && traitColor(A.brush), style: A.style })}</g>`;
+    const xs = Object.values(pos).map(p => p.x), ys = Object.values(pos).map(p => p.y);
+    const longest = Math.max(...Object.values(M.nodes).filter(n => n.t).map(n => tipName(n.t).length)) * 6.6 * 0.87;
+    const x0 = Math.min(...xs) - 30, x1 = Math.max(...xs) + longest * 0.5 + 30, y0 = Math.min(...ys) - longest - 20, y1 = Math.max(...ys) + STEM + 10;
+    svg.setAttribute('viewBox', `${x0} ${y0} ${x1 - x0} ${y1 - y0}`);
+    // which alternatives matter for this deck
+    const sigs = P.variants.map(v => [...P.restrict(v, A.S.deck).clusters.keys()].sort().join('|'));
+    const distinct = sigs.map((s, j) => sigs.indexOf(s) === j ? j : -1).filter(j => j >= 0);
+    $('#alts').innerHTML = distinct.length > 1 ? distinct.map((j, n) => `<button data-v="${j}" class="${(sigs[A.variant] === sigs[j]) ? 'on' : ''}">${n + 1}</button>`).join('') : '';
+  }
+
+  /* ── selection tools & labeler ─────────────────────────────────── */
+
+  const toScreen = p => ({ x: p.x * A.view.k + A.view.x, y: p.y * A.view.k + A.view.y });
+  const toWorld = (cx, cy) => { const r = cv.getBoundingClientRect(); return { x: (cx - r.left - A.view.x) / A.view.k, y: (cy - r.top - A.view.y) / A.view.k }; };
+
+  function renderTools() {
+    const t = $('#tools');
+    if (!A.sel || !POS[A.sel] || A.drag) { t.hidden = true; return; }
+    const n = A.S.nodes[A.sel], s = toScreen(POS[A.sel]);
+    t.hidden = false;
+    t.style.left = s.x + 'px'; t.style.top = s.y + 'px';
+    t.querySelector('[data-a=rotate]').disabled = n.k.length < 2;
+    t.querySelector('[data-a=collapse]').disabled = !n.k.length;
+  }
+
+  function editLabel(id) {
+    const inp = $('#labeler'), p = toScreen(POS[id]);
+    inp.hidden = false;
+    inp.style.left = p.x + 'px'; inp.style.top = (p.y + 30) + 'px';
+    inp.value = A.S.nodes[id].lab || '';
+    inp.dataset.id = id;
+    $('#tools').hidden = true;
+    inp.focus(); inp.select();
+  }
+  function closeLabel(ok) {
+    const inp = $('#labeler');
+    if (inp.hidden) return;
+    inp.hidden = true;
+    const id = inp.dataset.id;
+    if (ok && A.S.nodes[id]) commit(S => F.label(S, id, inp.value));
+    else render();
+  }
+  $('#labeler').addEventListener('keydown', e => {
+    if (e.key === 'Enter') closeLabel(true);
+    if (e.key === 'Escape') closeLabel(false);
+    e.stopPropagation();
+  });
+  $('#labeler').addEventListener('blur', () => closeLabel(true));
+
+  function act(a, id) {
+    id = id || A.sel;
+    if (!id || !A.S.nodes[id]) return;
+    if (a === 'label') return editLabel(id);
+    if (a === 'rotate') commit(S => F.rotate(S, id));
+    if (a === 'split') commit(S => { const r = F.split(S, id); A.sel = r; });
+    if (a === 'collapse') commit(S => F.collapse(S, id));
+    if (a === 'remove') { A.sel = null; commit(S => F.remove(S, id)); renderChips(); renderTraits(); }
+  }
+  $('#tools').addEventListener('pointerdown', e => e.stopPropagation());
+  $('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+  /* ── canvas pointer handling ───────────────────────────────────── */
+
+  function findTarget(w, exclude, shift) {
+    let best = null, bd = (HIT + 4) / Math.min(A.view.k, 1.4);
+    for (const id in POS) {
+      if (exclude && exclude.has(id)) continue;
+      const p = POS[id], dd = Math.hypot(p.x - w.x, p.y - w.y);
+      if (dd < bd) { bd = dd; best = id; }
+    }
+    if (!best) return null;
+    const n = A.S.nodes[best];
+    const mode = n.ph ? 'fill' : (shift && n.k.length) ? 'poly' : 'join';
+    return { id: best, mode, before: w.x < POS[best].x };
+  }
+
+  function overPool(cx, cy) {
+    const r = $('#pool').getBoundingClientRect();
+    return r.width > 0 && cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom;
+  }
+  function overStage(cx, cy) { const r = cv.getBoundingClientRect(); return cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom; }
+
+  let lastTap = { t: 0, id: null };
+
+  cv.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    closeLabel(true);
+    const nEl = e.target.closest('[data-n]'), bEl = e.target.closest('[data-b]'), lEl = e.target.closest('[data-l]');
+    const w = toWorld(e.clientX, e.clientY);
+    if (lEl) { editLabel(lEl.dataset.l); e.preventDefault(); return; }
+    if (A.brush && (bEl || nEl)) {
+      const id = (bEl || nEl).dataset.b || (bEl || nEl).dataset.n;
+      if (!A.S.nodes[id].ph) commit(S => F.mark(S, A.brush, id, e.shiftKey || e.altKey));
+      renderTraits();
       return;
     }
-    const node = r.pick(state.lay, e.offsetX, e.offsetY);
-    if (node !== r.hover) { r.hover = node; invalidate(false); }
-    showTooltip(node, e.offsetX, e.offsetY);
-  });
-  canvas.addEventListener('pointerup', (e) => {
-    canvas.classList.remove('grabbing');
-    const wasDrag = drag && drag.moved;
-    drag = null;
-    if (wasDrag) return;
-    const node = r.pick(state.lay, e.offsetX, e.offsetY);
-    if (node < 0) return;
-    if (state.collapsed.has(node)) {
-      expand(state.tree, state.collapsed, node, e.altKey);
-      invalidate(true);
-    } else if (!state.tree.isTip(node) && e.offsetX < r.plotL + r.plotW) {
-      collapseNode(state.tree, state.collapsed, node);
-      invalidate(true);
+    const id = nEl ? nEl.dataset.n : bEl ? bEl.dataset.b : null;
+    if (id) {
+      const p = POS[id];
+      A.drag = { kind: 'node', id, sx: e.clientX, sy: e.clientY, off: { x: p.x - w.x, y: p.y - w.y }, world: w, moved: false };
+    } else {
+      A.drag = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: A.view.x, vy: A.view.y, moved: false };
     }
-    select(node);
-  });
-  canvas.addEventListener('pointerleave', () => {
-    $('tooltip').hidden = true;
-    if (r.hover !== -1) { r.hover = -1; invalidate(false); }
+    cv.setPointerCapture(e.pointerId);
   });
 
-  canvas.addEventListener('keydown', (e) => {
-    const page = (r.h - 60);
-    if (e.key === 'ArrowDown') r.view.scrollY = clamp(r.view.scrollY + r.view.rowH, 0, r.maxScroll(state.lay.nRows));
-    else if (e.key === 'ArrowUp') r.view.scrollY = clamp(r.view.scrollY - r.view.rowH, 0, r.maxScroll(state.lay.nRows));
-    else if (e.key === 'PageDown') r.view.scrollY = clamp(r.view.scrollY + page, 0, r.maxScroll(state.lay.nRows));
-    else if (e.key === 'PageUp') r.view.scrollY = clamp(r.view.scrollY - page, 0, r.maxScroll(state.lay.nRows));
-    else if (e.key === '+' || e.key === '=') setRowHeight(r.view.rowH * 1.15);
-    else if (e.key === '-') setRowHeight(r.view.rowH / 1.15);
-    else if (e.key === 'Escape') { r.selected = -1; $('detail').hidden = true; }
-    else return;
-    e.preventDefault();
-    invalidate(false);
-  });
+  cv.addEventListener('pointermove', e => { if (A.drag && A.drag.kind !== 'chip') dragMove(e); });
+  cv.addEventListener('pointerup', e => { if (A.drag && A.drag.kind !== 'chip') dragEnd(e); });
+  cv.addEventListener('pointercancel', () => { A.drag = null; cv.classList.remove('pan'); render(); });
 
-  $('btnZoomIn').onclick = () => setRowHeight(r.view.rowH * 1.25);
-  $('btnZoomOut').onclick = () => setRowHeight(r.view.rowH / 1.25);
-  $('btnFitTime').onclick = () => {
-    r.view.tMax = state.tree.meta.rootAge; r.view.tMin = 0; invalidate(false);
-  };
-  $('btnReset').onclick = () => {
-    state.collapsed = new Set(state.defaultCollapsed);
-    r.view = { tMax: state.tree.meta.rootAge, tMin: 0, scrollY: 0, rowH: 22 };
-    r.selected = -1;
-    $('detail').hidden = true;
-    invalidate(true);
-    writeUrl();
-  };
-  $('menuBtn').onclick = () => {
-    const open = $('sidebar').classList.toggle('open');
-    $('menuBtn').setAttribute('aria-expanded', String(open));
-  };
-
-  $('optImputed').onchange = (e) => { r.showImputed = e.target.checked; invalidate(false); };
-  $('optExtinct').onchange = (e) => { state.hideExtinct = !e.target.checked; invalidate(true); };
-
-  const search = $('search');
-  search.addEventListener('input', () => runSearch(search.value));
-  search.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      const first = $('results').querySelector('button');
-      if (first) first.click();
+  function dragMove(e) {
+    const d = A.drag;
+    if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) return;
+    if (!d.moved && d.kind === 'chip') $('#pool').classList.remove('open');
+    d.moved = true;
+    if (d.kind === 'pan') {
+      A.view.x = d.vx + e.clientX - d.sx; A.view.y = d.vy + e.clientY - d.sy;
+      cv.classList.add('pan');
+      world.setAttribute('transform', `translate(${A.view.x},${A.view.y}) scale(${A.view.k})`);
+      renderTools();
+      return;
     }
-  });
+    d.world = toWorld(e.clientX, e.clientY);
+    d.over = overStage(e.clientX, e.clientY);
+    d.toPool = overPool(e.clientX, e.clientY);
+    $('#pool').classList.toggle('drop', d.toPool && d.kind === 'node');
+    const exclude = d.kind === 'node' ? new Set(F.sub(A.S, d.id)) : null;
+    d.target = d.over && !d.toPool ? findTarget(d.kind === 'node' ? { x: d.world.x + d.off.x, y: d.world.y + d.off.y } : d.world, exclude, e.shiftKey) : null;
+    if (d.kind === 'chip') {
+      const dc = $('#dragchip');
+      dc.hidden = d.over && !d.toPool;
+      dc.style.left = e.clientX + 'px'; dc.style.top = e.clientY + 'px';
+    }
+    render();
+  }
 
-  window.addEventListener('hashchange', readUrl);
-}
-
-function setRowHeight(h) {
-  const r = state.renderer;
-  r.view.rowH = clamp(h, 1.2, 40);
-  r.view.scrollY = clamp(r.view.scrollY, 0, r.maxScroll(state.lay.nRows));
-  invalidate(false);
-}
-
-function zoomTime(px, factor) {
-  const r = state.renderer;
-  const anchor = r.ageAt(px);
-  let tMax = anchor + (r.view.tMax - anchor) * factor;
-  let tMin = anchor - (anchor - r.view.tMin) * factor;
-  const limit = state.tree.meta.rootAge * 1.02;
-  tMin = Math.max(0, tMin);
-  tMax = Math.min(limit, tMax);
-  if (tMax - tMin < 0.05) return;
-  r.view.tMax = tMax; r.view.tMin = tMin;
-  invalidate(false);
-}
-
-function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
-
-// --------------------------------------------------------------------------
-// Selection and detail
-// --------------------------------------------------------------------------
-
-function select(node) {
-  state.renderer.selected = node;
-  renderDetail(node);
-  invalidate(false);
-  writeUrl();
-}
-
-function nodeInfo(node) {
-  const t = state.tree;
-  const r = state.renderer;
-  const clade = r.cladeByNode.get(node);
-  const fossil = r.fossilByNode.get(node);
-  const taxon = r.taxonByNode.get(node);
-  const raw = t.label(node);
-  return {
-    node,
-    label: (clade && clade.label) || (fossil && fossil.label) || (taxon && taxon.label) || raw
-      || (t.isTip(node) ? 'unnamed tip' : 'unnamed node'),
-    vernacular: (clade && clade.vernacular) || (fossil && fossil.vernacular)
-      || (taxon && taxon.vernacular) || state.common.get(node) || null,
-    clade, fossil, taxon,
-    isTip: t.isTip(node),
-    extinct: t.flag(node, FLAG_EXTINCT),
-    imputed: t.flag(node, FLAG_IMPUTED),
-    age: t.age(node),
-    tips: t.tipCount[node],
-    extinctTips: t.extinctCount[node],
-    imputedTips: t.imputedCount[node],
-    source: t.source[node] < 255 ? t.meta.sources[t.source[node]] : null,
-  };
-}
-
-function renderDetail(node) {
-  const el = $('detail');
-  if (node < 0) { el.hidden = true; return; }
-  const t = state.tree;
-  const info = nodeInfo(node);
-  const parts = [];
-
-  parts.push(`<h2>${esc(info.label)}</h2>`);
-  if (info.vernacular) parts.push(`<p class="vern">${esc(info.vernacular)}</p>`);
-
-  const badges = [];
-  if (info.extinct) badges.push('<span class="badge badge-extinct">extinct</span>');
-  if (info.imputed) badges.push('<span class="badge badge-imputed">placed by taxonomy</span>');
-  if (info.fossil) {
-    for (const g of state.renderer.gradeByBit) {
-      if (info.fossil.grades & (1 << g.bit)) {
-        badges.push(`<span class="badge badge-grade" style="background:${esc(g.colour || '#777')}">${esc(g.label)}</span>`);
+  function dragEnd(e) {
+    const d = A.drag;
+    A.drag = null;
+    cv.classList.remove('pan');
+    $('#pool').classList.remove('drop');
+    $('#dragchip').hidden = true;
+    if (d.kind === 'pan') {
+      if (!d.moved) { A.sel = null; render(); }
+      save();
+      return;
+    }
+    if (!d.moved) {
+      if (d.kind === 'node') return tap(d.id);
+      if (d.kind === 'chip') return placeChip(d.key);
+      return;
+    }
+    if (d.kind === 'chip' && !d.over) { render(); return; }
+    if (d.kind === 'node' && d.toPool) { A.sel = null; commit(S => F.remove(S, d.id)); return renderAfterTips(); }
+    commit(S => {
+      const a = d.kind === 'chip' ? F.addTip(S, d.key, d.world.x, d.world.y) : d.id;
+      const t = d.target;
+      if (!t) {
+        if (d.kind === 'node') F.detach(S, a, d.world.x + d.off.x, d.world.y + d.off.y);
+        return;
       }
-    }
-  }
-  if (badges.length) parts.push(`<p>${badges.join('')}</p>`);
-
-  const dl = [];
-  if (info.fossil) {
-    dl.push(['Known from', `${fmtAge(info.fossil.fa)} to ${fmtAge(info.fossil.la)} Ma`]);
-    dl.push(['Diverged', `${fmtAge(t.age(t.parent(node)))} Ma`]);
-  } else if (!info.isTip) {
-    dl.push(['Crown age', `${fmtAge(info.age)} Ma`]);
-  } else if (info.age > 0) {
-    dl.push(['Terminates', `${fmtAge(info.age)} Ma`]);
-  }
-  if (!info.isTip) {
-    dl.push(['Tips', info.tips.toLocaleString()]);
-    if (info.extinctTips) dl.push(['Extinct lineages', String(info.extinctTips)]);
-    if (info.imputedTips) {
-      dl.push(['Placed by taxonomy',
-        `${info.imputedTips.toLocaleString()} of ${info.tips.toLocaleString()}`]);
-    }
-  }
-  if (info.taxon && info.taxon.rank) dl.push(['Rank', info.taxon.rank]);
-  if (info.taxon && info.taxon.nonMono) {
-    dl.push(['Monophyly', `not a clade here \u2014 this node holds `
-      + `${info.taxon.holds.toLocaleString()} tips, of which `
-      + `${info.taxon.members.toLocaleString()} carry the name`]);
-  }
-  if (info.source) dl.push(['Source', esc(info.source.citation || info.source.label)]);
-  if (dl.length) {
-    parts.push('<dl>' + dl.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('') + '</dl>');
-  }
-
-  const note = (info.fossil && info.fossil.note) || (info.clade && info.clade.note);
-  if (note) parts.push(`<p class="note">${esc(note)}</p>`);
-  if (info.source && info.source.note) parts.push(`<p class="note">${esc(info.source.note)}</p>`);
-
-  const refs = ((info.fossil && info.fossil.refs) || (info.clade && info.clade.refs) || []);
-  if (refs.length) {
-    parts.push('<ul class="refs">' + refs.map((x) => `<li>${esc(x)}</li>`).join('') + '</ul>');
-  }
-
-  parts.push('<div class="actions">');
-  if (!info.isTip) {
-    parts.push(state.collapsed.has(node)
-      ? '<button class="tool" data-act="expand">Open</button>'
-      : '<button class="tool" data-act="collapse">Close</button>');
-    parts.push(`<button class="tool" data-act="expandAll">Open fully`
-      + `<span class="muted"> ${info.tips.toLocaleString()} rows</span></button>`);
-  }
-  parts.push('<button class="tool" data-act="zoom">Zoom to this</button>');
-  parts.push('<button class="tool" data-act="path">Show path to root</button>');
-  parts.push('</div>');
-
-  el.innerHTML = parts.join('');
-  el.hidden = false;
-  el.querySelectorAll('button[data-act]').forEach((b) => {
-    b.onclick = () => detailAction(b.dataset.act, node);
-  });
-}
-
-function detailAction(act, node) {
-  const t = state.tree, r = state.renderer;
-  if (act === 'expand') { expand(t, state.collapsed, node, false); invalidate(true); }
-  else if (act === 'expandAll') {
-    // No confirmation dialog. Opening the 31,516-tip fish clade measures at
-    // about 60 ms end to end, so there is nothing to warn about, and a modal
-    // here would block the render loop as well as the reader.
-    expand(t, state.collapsed, node, true); invalidate(true);
-  } else if (act === 'collapse') { collapseNode(t, state.collapsed, node); invalidate(true); }
-  else if (act === 'zoom') {
-    const lo = t.minAge[node], hi = t.age(node);
-    const pad = Math.max((hi - lo) * 0.08, 2);
-    r.view.tMax = hi + pad; r.view.tMin = Math.max(0, lo - pad);
-    scrollTo(node);
-  } else if (act === 'path') {
-    revealPath(t, state.collapsed, node);
-    invalidate(true);
-    requestAnimationFrame(() => scrollTo(node));
-  }
-  renderDetail(node);
-  writeUrl();
-}
-
-function scrollTo(node) {
-  const r = state.renderer;
-  state.lay = layout(state.tree, state.collapsed, state);
-  state.needsLayout = false;
-  const target = visibleAncestor(state.tree, state.collapsed, node);
-  const row = state.lay.yOf[target];
-  if (row >= 0) {
-    r.view.scrollY = clamp(row * r.view.rowH - (r.h - 46) / 2, 0, r.maxScroll(state.lay.nRows));
-  }
-  invalidate(false);
-}
-
-// --------------------------------------------------------------------------
-// Tooltip
-// --------------------------------------------------------------------------
-
-function showTooltip(node, px, py) {
-  const tip = $('tooltip');
-  if (node < 0) { tip.hidden = true; return; }
-  const info = nodeInfo(node);
-  const bits = [`<strong>${esc(info.label)}</strong>`];
-  if (info.vernacular) bits.push(`<span class="t-sub">${esc(info.vernacular)}</span><br>`);
-  if (info.fossil) {
-    bits.push(`<span class="t-sub">${fmtAge(info.fossil.fa)}&ndash;${fmtAge(info.fossil.la)} Ma &middot; extinct</span>`);
-  } else if (!info.isTip) {
-    bits.push(`<span class="t-sub">${info.tips.toLocaleString()} tips &middot; crown ${fmtAge(info.age)} Ma</span>`);
-  } else if (info.imputed) {
-    bits.push('<span class="t-sub">placed by taxonomy, not by data</span>');
-  }
-  tip.innerHTML = bits.join('');
-  tip.hidden = false;
-  const r = tip.getBoundingClientRect();
-  const stage = $('canvas').getBoundingClientRect();
-  tip.style.left = Math.min(px + 14, stage.width - r.width - 8) + 'px';
-  tip.style.top = Math.min(py + 14, stage.height - r.height - 8) + 'px';
-}
-
-// --------------------------------------------------------------------------
-// Panels
-// --------------------------------------------------------------------------
-
-function buildAlternatives() {
-  const host = $('alternatives');
-  host.innerHTML = '';
-  for (const alt of state.tree.meta.alternatives) {
-    state.selection[alt.id] = alt.default;
-    const d = document.createElement('details');
-    d.className = 'alt';
-    d.id = 'alt-' + alt.id;
-    const opts = alt.options.map((o) => `
-      <label class="opt">
-        <input type="radio" name="alt-${esc(alt.id)}" value="${esc(o.id)}"
-               ${o.id === alt.default ? 'checked' : ''}>
-        <span>${esc(o.label)}</span>
-        ${o.sublabel ? `<span class="sub">${esc(o.sublabel)}</span>` : ''}
-        ${o.note ? `<span class="why">${esc(o.note)}</span>` : ''}
-      </label>`).join('');
-    d.innerHTML = `<summary>${esc(alt.label)}</summary>
-      ${alt.blurb ? `<p class="blurb">${esc(alt.blurb)}</p>` : ''}${opts}`;
-    host.appendChild(d);
-    d.querySelectorAll('input[type=radio]').forEach((input) => {
-      input.onchange = () => {
-        state.selection[alt.id] = input.value;
-        d.classList.toggle('changed', input.value !== alt.default);
-        reapply();
-      };
+      if (t.mode === 'fill') F.fill(S, t.id, a);
+      else if (t.mode === 'poly') F.addChild(S, t.id, a);
+      else F.join(S, a, t.id, t.before);
     });
+    render();
+    renderAfterTips();
   }
-}
+  function renderAfterTips() { renderChips(); renderTraits(); }
 
-function reapply() {
-  const t = state.tree;
-  const keptLabels = [...state.collapsed].map((n) => n);
-  applyAlternatives(t, state.selection);
-  // Node indices survive rearrangement, so the collapse set stays valid; drop
-  // anything that became a tip.
-  state.collapsed = new Set(keptLabels.filter((n) => !t.isTip(n)));
-  invalidate(true);
-  updateStats();
-  writeUrl();
-}
-
-function buildGrades() {
-  const host = $('grades');
-  host.innerHTML = '';
-  for (const g of state.tree.meta.grades) {
-    const lab = document.createElement('label');
-    lab.className = 'gcheck';
-    lab.innerHTML = `<input type="checkbox" value="${esc(g.id)}">
-      <span class="swatch" style="background:${esc(g.colour || '#777')}"></span>
-      <span class="gname">${esc(g.label)}
-        ${g.excludes ? `<span class="gnote">all of ${esc(g.excludes)}&rsquo;s stem except ${esc(g.excludes)}</span>` : ''}
-      </span>`;
-    host.appendChild(lab);
-    lab.querySelector('input').onchange = (e) => {
-      if (e.target.checked) state.renderer.highlightGrades.add(g.id);
-      else state.renderer.highlightGrades.delete(g.id);
-      invalidate(false);
-    };
+  function tap(id) {
+    const now = Date.now();
+    if (lastTap.id === id && now - lastTap.t < 350) { lastTap = { t: 0 }; editLabel(id); return; }
+    lastTap = { t: now, id };
+    A.sel = A.sel === id ? null : id;
+    render();
   }
-}
 
-function buildLegend() {
-  $('legend').innerHTML = [
-    ['--branch', 'living lineage'],
-    ['--extinct', 'extinct lineage, bar = fossil range'],
-    ['--imputed', 'species placed by taxonomy, not sequence data'],
-  ].map(([v, t]) => `<span class="row"><span class="key" style="border-top-color:var(${v})"></span>${esc(t)}</span>`)
-    .join('')
-    + `<span class="row">A name followed by * is not a clade in this tree: the node
-       named for it also contains species from other groups. ${state.tree.meta.stats.nonMonophyletic}
-       labels are marked this way, and ${state.tree.meta.stats.unlabelledTaxa} named taxa are
-       too scattered to label at all.</span>`
-    + '<span class="row">Dashed branches are schematic: either a topology alternative that has not been re-dated, or a tree with no branch-length estimates.</span>';
-}
-
-function buildSources() {
-  const host = $('sources');
-  const seen = new Set();
-  host.innerHTML = state.tree.meta.sources.map((s) => {
-    if (!s.citation || seen.has(s.citation)) return '';
-    seen.add(s.citation);
-    const link = s.doi ? `https://doi.org/${s.doi}` : s.url;
-    return `<li><b>${esc(s.label)}</b> &mdash; ${link
-      ? `<a href="${esc(link)}" target="_blank" rel="noopener">${esc(s.citation)}</a>`
-      : esc(s.citation)}</li>`;
-  }).join('');
-  const m = state.tree.meta;
-  $('buildinfo').textContent =
-    `Built ${m.generated.slice(0, 10)}. Deep backbone ages are hand-entered from the `
-    + 'literature; fossil ages are stage-level approximations for teaching, not calibrations.';
-}
-
-function updateStats() {
-  const m = state.tree.meta.stats;
-  $('stats').textContent =
-    `${m.livingTips.toLocaleString()} living species · ${m.extinctTips} extinct lineages · `
-    + `${m.taxonomyPlaced.toLocaleString()} placed by taxonomy`
-    + (isModified(state.tree, state.selection) ? ' · topology altered' : '');
-}
-
-// --------------------------------------------------------------------------
-// Search
-// --------------------------------------------------------------------------
-
-function runSearch(q) {
-  const host = $('results');
-  const hits = state.search.query(q);
-  if (!hits.length) { host.hidden = true; host.innerHTML = ''; return; }
-  host.innerHTML = hits.map((h, i) => `
-    <li><button data-i="${i}">
-      <span class="kind">${esc(h.kind)}</span>${esc(h.text)}
-      ${h.extra ? `<span class="sub">${esc(h.extra)}</span>` : ''}
-    </button></li>`).join('');
-  host.hidden = false;
-  host.querySelectorAll('button').forEach((b) => {
-    b.onclick = () => {
-      const hit = hits[+b.dataset.i];
-      revealPath(state.tree, state.collapsed, hit.node);
-      if (!state.tree.isTip(hit.node)) collapseNode(state.tree, state.collapsed, hit.node);
-      invalidate(true);
-      state.lay = layout(state.tree, state.collapsed, state);
-      state.needsLayout = false;
-      select(hit.node);
-      scrollTo(hit.node);
-      host.hidden = true;
-      if (window.innerWidth <= 820) $('sidebar').classList.remove('open');
-    };
+  cv.addEventListener('dblclick', e => {
+    if (e.target.closest('[data-n],[data-b],[data-l]')) return;
+    const w = toWorld(e.clientX, e.clientY);
+    commit(S => { A.sel = F.newRoot(S, w.x, w.y + LEV); });
   });
-}
 
-// --------------------------------------------------------------------------
-// URL state
-// --------------------------------------------------------------------------
+  cv.addEventListener('wheel', e => {
+    e.preventDefault();
+    const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    const f = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0018));
+    zoomAt(mx, my, f);
+  }, { passive: false });
+  function zoomAt(mx, my, f) {
+    const k = Math.min(3, Math.max(0.25, A.view.k * f));
+    A.view.x = mx - (mx - A.view.x) * k / A.view.k;
+    A.view.y = my - (my - A.view.y) * k / A.view.k;
+    A.view.k = k;
+    world.setAttribute('transform', `translate(${A.view.x},${A.view.y}) scale(${A.view.k})`);
+    renderTools(); save();
+  }
+  $('#z-in').onclick = () => { const r = cv.getBoundingClientRect(); zoomAt(r.width / 2, r.height / 2, 1.25); };
+  $('#z-out').onclick = () => { const r = cv.getBoundingClientRect(); zoomAt(r.width / 2, r.height / 2, 0.8); };
 
-let writing = false;
-
-function writeUrl() {
-  const parts = [];
-  const r = state.renderer;
-  if (r.selected >= 0) parts.push('n=' + r.selected);
-  const alts = state.tree.meta.alternatives
-    .filter((a) => state.selection[a.id] !== a.default)
-    .map((a) => `${a.id}:${state.selection[a.id]}`);
-  if (alts.length) parts.push('a=' + alts.join(','));
-  const extra = [...state.collapsed].filter((n) => !state.defaultCollapsed.has(n));
-  const missing = [...state.defaultCollapsed].filter((n) => !state.collapsed.has(n));
-  if (extra.length && extra.length < 150) parts.push('c=' + extra.join('.'));
-  if (missing.length) parts.push('o=' + missing.join('.'));
-  writing = true;
-  history.replaceState(null, '', parts.length ? '#' + parts.join('&') : location.pathname);
-  writing = false;
-}
-
-function readUrl() {
-  if (writing) return;
-  const h = location.hash.replace(/^#/, '');
-  if (!h) return;
-  const q = Object.fromEntries(h.split('&').map((kv) => {
-    const i = kv.indexOf('=');
-    return i === -1 ? [kv, ''] : [kv.slice(0, i), kv.slice(i + 1)];
-  }));
-
-  if (q.a) {
-    for (const pair of q.a.split(',')) {
-      const [id, opt] = pair.split(':');
-      const alt = state.tree.meta.alternatives.find((a) => a.id === id);
-      if (alt && alt.options.some((o) => o.id === opt)) {
-        state.selection[id] = opt;
-        const input = document.querySelector(`input[name="alt-${CSS.escape(id)}"][value="${CSS.escape(opt)}"]`);
-        if (input) { input.checked = true; input.closest('.alt').classList.add('changed'); }
-      }
+  /* chips: drag in from the tip list */
+  $('#chips').addEventListener('pointerdown', e => {
+    const x = e.target.closest('[data-x]');
+    if (x) {
+      const k = x.dataset.x;
+      commit(S => { S.deck = S.deck.filter(d => d !== k); S.deckId = null; });
+      renderAll();
+      return;
     }
-    applyAlternatives(state.tree, state.selection);
+    const c = e.target.closest('.chip');
+    if (!c) return;
+    e.preventDefault();
+    A.drag = { kind: 'chip', key: c.dataset.k, sx: e.clientX, sy: e.clientY, moved: false, world: toWorld(e.clientX, e.clientY) };
+    $('#dragchip').textContent = c.textContent.replace(/×$/, '');
+  });
+  window.addEventListener('pointermove', e => { if (A.drag && A.drag.kind === 'chip') dragMove(e); });
+  window.addEventListener('pointerup', e => { if (A.drag && A.drag.kind === 'chip') dragEnd(e); });
+
+  /* click a chip: fill the selected slot, or place it beside the trees */
+  function placeChip(key) {
+    const sel = A.sel && A.S.nodes[A.sel];
+    commit(S => {
+      if (sel && sel.ph) {
+        const nx = F.addTip(S, key, 0, 0);
+        F.fill(S, sel.id, nx);
+        const next = Object.values(S.nodes).find(n => n.ph && F.rootOf(S, n.id) === F.rootOf(S, nx));
+        A.sel = next ? next.id : null;
+        return;
+      }
+      const pos = layoutAll(S);
+      const r = cv.getBoundingClientRect();
+      const c = toWorld(r.left + r.width / 2, r.top + r.height * 0.6);
+      let x = c.x, y = c.y;
+      const xs = Object.values(pos).map(p => p.x);
+      if (xs.length) { x = Math.max(...xs) + GAP * 1.5; y = Math.max(...S.roots.map(q => q.y)); }
+      F.addTip(S, key, x, y);
+    });
+    ensureVisible();
+    renderAfterTips();
   }
-  state.collapsed = new Set(state.defaultCollapsed);
-  if (q.o) for (const n of q.o.split('.')) state.collapsed.delete(+n);
-  if (q.c) for (const n of q.c.split('.')) if (!state.tree.isTip(+n)) state.collapsed.add(+n);
-  invalidate(true);
-  updateStats();
 
-  if (q.n) {
-    const n = +q.n;
-    state.lay = layout(state.tree, state.collapsed, state);
-    state.needsLayout = false;
-    state.renderer.selected = n;
-    renderDetail(n);
-    scrollTo(n);
+  function ensureVisible() {
+    const r = cv.getBoundingClientRect();
+    const xs = Object.values(POS).map(p => toScreen(p).x);
+    if (!xs.length) return;
+    const right = Math.max(...xs);
+    if (right > r.width - 60) { A.view.x -= right - (r.width - 120); render(); save(); }
   }
-}
 
-// --------------------------------------------------------------------------
+  /* ── tidy & fit ────────────────────────────────────────────────── */
 
-function fmtAge(a) {
-  if (a === undefined || a === null || !isFinite(a)) return '?';
-  if (a === 0) return '0';
-  if (a < 0.01) return a.toExponential(1);
-  if (a < 1) return a.toFixed(2);
-  if (a < 10) return a.toFixed(1);
-  return String(Math.round(a));
-}
+  function tidy() {
+    commit(S => {
+      const pos = layoutAll(S);
+      const rs = S.roots.slice().sort((a, b) => a.x - b.x);
+      let x = 0;
+      for (const r of rs) {
+        const w = pos[r.id].w || 0;
+        const local = layout(S.nodes, r.id, 0, 0);
+        const minx = Math.min(...F.sub(S, r.id).map(i => local[i].x));
+        r.x = x - minx; r.y = 0;
+        x += w + GAP * 2.5;
+      }
+    });
+    fit();
+  }
+  function fit() {
+    const ps = Object.values(POS);
+    if (!ps.length) { A.view = { x: cv.clientWidth / 2, y: cv.clientHeight * 0.7, k: 1 }; render(); return; }
+    const x0 = Math.min(...ps.map(p => p.x)) - 30, x1 = Math.max(...ps.map(p => p.x)) + 90;
+    const y0 = Math.min(...ps.map(p => p.y)) - 110, y1 = Math.max(...ps.map(p => p.y)) + STEM + 30;
+    const W = cv.clientWidth, H = cv.clientHeight;
+    const k = Math.min(1.3, Math.max(0.25, Math.min(W / (x1 - x0), H / (y1 - y0))));
+    A.view = { k, x: (W - (x1 + x0) * k) / 2, y: (H - (y1 + y0) * k) / 2 };
+    render(); save();
+  }
 
-function esc(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+  /* ── decks ─────────────────────────────────────────────────────── */
+
+  function newDeck(keys, id, name) {
+    commit(S => {
+      const fresh = P.emptyState(keys);
+      for (const k in S) delete S[k];
+      Object.assign(S, fresh, { deckId: id || null, deckName: name || '' });
+    });
+    A.sel = null; A.brush = null;
+    renderAll();
+    A.view = { x: 60, y: cv.clientHeight * 0.75, k: 1 };
+    render();
+  }
+
+  $('#deck').addEventListener('change', e => {
+    const d = P.DECKS.find(x => x.id === e.target.value);
+    if (d) newDeck(d.tips, d.id);
+    else newDeck([], null, 'Custom');
+  });
+
+  const SCOPES = ['chordata', 'vertebrata', 'gnathostomata', 'chondrichthyes', 'actinopterygii', 'teleostei', 'sarcopterygii', 'tetrapoda', 'lissamphibia', 'amniota', 'mammalia', 'eutheria', 'lepidosauria', 'squamata', 'testudines', 'archosauria', 'aves'];
+  $('#scope').innerHTML = SCOPES.map(k => `<option value="${k}">${esc(P.refByKey.get(k).name)}</option>`).join('');
+  $('#b-fos').onclick = () => $('#b-fos').classList.toggle('on');
+  $('#b-deal').onclick = () => {
+    const scope = $('#scope').value, n = +$('#count').value;
+    newDeck(P.deal(scope, n, null, $('#b-fos').classList.contains('on')), null, '🎲 ' + P.refByKey.get(scope).name);
+  };
+
+  /* add any tip by name */
+  const allTaxa = [...P.refByKey.values()].filter(n => n.name && !n.hidden);
+  $('#taxa').innerHTML = allTaxa.map(n => `<option value="${esc(n.name)}">`).join('');
+  $('#clades').innerHTML = P.cladeNames.map(n => `<option value="${esc(n)}">`).join('');
+  $('#add').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const v = e.target.value.trim().toLowerCase();
+    const n = allTaxa.find(x => x.name.toLowerCase() === v) || allTaxa.find(x => x.name.toLowerCase().startsWith(v));
+    if (!n) return;
+    if (A.S.deck.some(k => P.nested(k, n.key))) { e.target.select(); e.target.animate([{ borderColor: 'var(--bad)' }, {}], 600); return; }
+    commit(S => { S.deck.push(n.key); S.deckId = null; S.deckName = S.deckName || 'Custom'; });
+    e.target.value = '';
+    renderAll();
+  });
+
+  /* ── traits panel ──────────────────────────────────────────────── */
+
+  $('#tlist').addEventListener('click', e => {
+    const r = e.target.closest('.trait');
+    if (!r) return;
+    A.brush = A.brush === r.dataset.t ? null : r.dataset.t;
+    A.sel = null;
+    renderTraits(); render();
+  });
+  $('#tfilter').addEventListener('input', renderTraits);
+  $('#tnew').addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || !e.target.value.trim()) return;
+    const name = e.target.value.trim(), id = 'u_' + P.slug(name);
+    const known = P.TRAITS.find(t => t.name.toLowerCase() === name.toLowerCase());
+    if (known) A.brush = known.id;
+    else {
+      if (!A.S.custom.some(c => c.id === id)) commit(S => S.custom.push({ id, name }));
+      A.brush = id;
+    }
+    e.target.value = '';
+    renderTraits(); render();
+  });
+
+  /* ── top bar ───────────────────────────────────────────────────── */
+
+  $('#b-undo').onclick = () => { undo(); };
+  $('#b-redo').onclick = () => { redo(); };
+  $('#b-tidy').onclick = tidy;
+  $('#b-clear').onclick = () => { commit(S => { S.nodes = {}; S.roots = []; S.marks = {}; }); A.sel = null; renderAll(); };
+  $('#b-style').onclick = () => { A.style = A.style === 'square' ? 'slant' : 'square'; save(); render(); };
+  $('#b-check').onclick = () => { A.check = !A.check; $('#b-check').classList.toggle('on', A.check); save(); render(); renderTraits(); };
+  $('#b-answer').onclick = () => { A.answer = !A.answer; $('#b-answer').classList.toggle('on', A.answer); $('#answer').hidden = !A.answer; render(); };
+  $('#alts').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (b) { A.variant = +b.dataset.v; renderAnswer(); } });
+  $('#b-help').onclick = () => { $('#help').hidden = false; };
+  $('#help').onclick = () => { $('#help').hidden = true; };
+  $('#b-pool').onclick = () => { $('#pool').classList.toggle('open'); $('#traits').classList.remove('open'); };
+  $('#b-traits').onclick = () => {
+    if (matchMedia('(max-width: 760px)').matches) { $('#traits').classList.toggle('open'); $('#pool').classList.remove('open'); }
+    else $('#traits').hidden = !$('#traits').hidden;
+  };
+
+  window.addEventListener('keydown', e => {
+    if (e.target.matches('input, select')) return;
+    const mod = e.metaKey || e.ctrlKey;
+    if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+    if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
+    if (mod) return;
+    if (e.key === 'Escape') { A.sel = null; A.brush = null; $('#help').hidden = true; renderTraits(); render(); return; }
+    if (e.key === '?') { $('#help').hidden = !$('#help').hidden; return; }
+    if (!A.sel) return;
+    const m = { Enter: 'label', l: 'label', r: 'rotate', s: 'split', c: 'collapse', Delete: 'remove', Backspace: 'remove' }[e.key];
+    if (m) { e.preventDefault(); act(m); }
+  });
+  window.addEventListener('resize', () => render());
+
+  /* ── start ─────────────────────────────────────────────────────── */
+
+  if (!load()) {
+    const d = P.DECKS[0];
+    A.S = P.emptyState(d.tips); A.S.deckId = d.id;
+  }
+  $('#b-check').classList.toggle('on', A.check);
+  renderAll();
+  if (!A.S.roots.length) { A.view = { x: 60, y: cv.clientHeight * 0.75, k: 1 }; render(); }
+  try { if (!localStorage.getItem(KEY + '.seen')) { $('#help').hidden = false; localStorage.setItem(KEY + '.seen', '1'); } } catch (e) { /* storage off */ }
+
+  P.app = A;   // for debugging
+})(window.P);

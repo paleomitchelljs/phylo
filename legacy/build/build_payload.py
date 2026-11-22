@@ -153,6 +153,38 @@ def load_taxonomy(spec):
 # 3. Grafting the published clade trees
 # --------------------------------------------------------------------------
 
+def strip_vouchers(sub):
+    """Cut museum voucher codes off tip labels: Cuora_trifasciata_KFBG030278065.
+
+    Keeps the genus plus any following all-lowercase tokens, so binomials,
+    trinomials and `Genus_sp` survive and everything from the first
+    capitalised or digit-bearing token onwards is dropped. A name that would
+    collide with another tip keeps its voucher, because two samples of one
+    species are the one case where the code is the only thing separating them.
+    """
+    def binomial(name):
+        parts = name.split("_")
+        out = [parts[0]]
+        for x in parts[1:]:
+            if not (x.isalpha() and x.islower()):
+                break
+            out.append(x)
+        return "_".join(out)
+
+    tips = [nd for nd in P.iter_nodes(sub) if nd.is_tip and nd.name]
+    proposed = {id(nd): binomial(nd.name) for nd in tips}
+    counts = {}
+    for v in proposed.values():
+        counts[v] = counts.get(v, 0) + 1
+    n = 0
+    for nd in tips:
+        want = proposed[id(nd)]
+        if want != nd.name and counts[want] == 1 and "_" in want:
+            nd.name = want
+            n += 1
+    return n
+
+
 def graft_sources(index, sources, hand_built, taxonomy):
     """Replace backbone graft points with real clade trees."""
     source_meta = []
@@ -217,6 +249,22 @@ def graft_sources(index, sources, hand_built, taxonomy):
         if drop:
             present = {nd.name for nd in P.iter_nodes(sub) if nd.is_tip}
             sub = P.drop_tips(sub, drop & present)
+
+        # Order matters: dropPattern sees the labels as the published file
+        # spells them, and `rename` sees them as the reader will.
+        if spec.get("tipNames") == "binomial":
+            n_cut = strip_vouchers(sub)
+            if n_cut:
+                print(f"    trimmed voucher codes off {n_cut} tip label(s)")
+        renames = {P.normalise_label(k): P.normalise_label(v)
+                   for k, v in spec.get("rename", {}).items()}
+        if renames:
+            hit = {nd.name for nd in P.iter_nodes(sub) if nd.is_tip} & set(renames)
+            for missing in sorted(set(renames) - hit):
+                warn(f"{spec['graftAt']}: rename target '{missing}' is not a tip")
+            for nd in P.iter_nodes(sub):
+                if nd.is_tip and nd.name in renames:
+                    nd.name = renames[nd.name]
 
         sub, n_sup = P.suppress_single_child(sub)
         if n_sup:
@@ -332,6 +380,7 @@ def insert_fossils(root, index, fossils, grade_ids):
                 "exemplarOf": f.get("exemplarOf"),
                 "firstAppearance": fa, "lastAppearance": la,
                 "gradeMask": mask, "note": f.get("note"),
+                "featured": bool(f.get("featured")),
                 "refs": f.get("refs", []),
             }
             joint, attached_to = P.attach_on_lineage(target, tip, split)
@@ -597,11 +646,14 @@ def main():
             "vernacular": m.get("vernacular"), "exemplarOf": m.get("exemplarOf"),
             "fa": m["firstAppearance"], "la": m["lastAppearance"],
             "grades": m["gradeMask"], "note": m.get("note"),
+            "featured": m.get("featured", False),
             "refs": m.get("refs", []),
         })
 
     taxon_nodes = [
         {"node": i, "label": nd.name, "rank": (nd.meta or {}).get("rank"),
+         **({"vernacular": nd.meta["vernacular"]}
+            if (nd.meta or {}).get("vernacular") else {}),
          **({"nonMono": True, "members": nd.meta["members"],
              "holds": nd.meta["holds"]} if (nd.meta or {}).get("nonMono") else {})}
         for i, nd in enumerate(order)
@@ -665,6 +717,7 @@ def main():
         "stats": {
             "livingTips": n_tips - n_extinct,
             "extinctTips": n_extinct,
+            "featuredExtinct": sum(1 for f in fossil_meta if f["featured"]),
             "taxonomyPlaced": n_imputed,
             "gradesDefined": len(grades_spec["grades"]),
             "nonMonophyletic": sum(n_non.values()),

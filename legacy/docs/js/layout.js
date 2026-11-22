@@ -10,8 +10,16 @@ export function layout(tree, collapsed, opts) {
   // "Show extinct lineages" off means dropping any branch whose entire subtree
   // is extinct -- the whole stem, not just the tips, since a stem lineage with
   // no living descendants is exactly what should disappear.
+  //
+  // `minorExtinct` is the second level of that filter: the extinct lineages a
+  // vertebrate course does not name, hidden unless the reader asks for all of
+  // them. Same rule either way -- an entirely extinct branch, so nothing living
+  // ever disappears with it.
   const hideExtinct = !!(opts && opts.hideExtinct);
-  const drop = (i) => hideExtinct && tree.extinctCount[i] === tree.tipCount[i];
+  const minor = (opts && opts.minorExtinct) || null;
+  const filtering = hideExtinct || minor !== null;
+  const drop = (i) => (hideExtinct || (minor !== null && minor.has(i)))
+    && tree.extinctCount[i] === tree.tipCount[i];
   const yOf = new Float32Array(tree.cap).fill(-1);
   // Row span of each visible node's subtree. The renderer culls against these
   // instead of reading children, which is the difference between touching
@@ -20,6 +28,14 @@ export function layout(tree, collapsed, opts) {
   const hi = new Float32Array(tree.cap);
   const rows = [];
   const visible = [];
+  // Runs of adjacent tips that would print the same label collapse to one row.
+  // The source trees carry a lot of them: 3,872 squamate tips are placeholders
+  // that all render as `Genus sp.`, and twenty identical rows tell the reader
+  // less than one row saying twenty. `dup` maps the row's node to how many tips
+  // it stands for, and is only populated where that is more than one.
+  const keys = tree.rowKeys();
+  const dup = new Map();
+  let lastKey = -1;
 
   const ENTER = 0, EXIT = 1;
   const stack = [[tree.root, ENTER]];
@@ -32,10 +48,21 @@ export function layout(tree, collapsed, opts) {
       // Only pay for the copy when the filter is actually on; this runs for
       // every one of 133,000 nodes when the tree is fully expanded.
       const all = tree.children(i);
-      const kids = hideExtinct ? all.filter((c) => !drop(c)) : all;
+      const kids = filtering ? all.filter((c) => !drop(c)) : all;
       if (kids.length === 0 || collapsed.has(i)) {
-        yOf[i] = lo[i] = hi[i] = rows.length;
-        rows.push(i);
+        // Only a real tip merges. A node left childless by the extinct filter
+        // is standing in for a clade and keeps its own row.
+        const key = all.length === 0 ? keys[i] : -1;
+        if (key !== -1 && key === lastKey) {
+          const r = rows.length - 1;
+          yOf[i] = lo[i] = hi[i] = r;
+          const rep = rows[r];
+          dup.set(rep, (dup.get(rep) || 1) + 1);
+        } else {
+          yOf[i] = lo[i] = hi[i] = rows.length;
+          rows.push(i);
+          lastKey = key;
+        }
       } else {
         stack.push([i, EXIT, kids]);
         for (let k = kids.length - 1; k >= 0; k--) stack.push([kids[k], ENTER]);
@@ -55,7 +82,7 @@ export function layout(tree, collapsed, opts) {
     }
   }
 
-  return { yOf, lo, hi, rows, visible, nRows: rows.length };
+  return { yOf, lo, hi, rows, visible, dup, nRows: rows.length };
 }
 
 /** Collapse everything strictly below the given nodes. */
@@ -75,11 +102,19 @@ export function revealPath(tree, collapsed, node) {
  * Expand `node` by one level, or fully when `deep` is set.
  * Guards against blowing the row count open by accident: a deep expand of
  * Actinopterygii is 31,000 rows and the caller may want to warn first.
+ *
+ * One level means down to the nearest *named* descendants, not to the immediate
+ * children. The published trees are full of unlabelled bifurcations, and
+ * stopping on one leaves the reader a triangle captioned "unnamed clade",
+ * which tells them nothing and costs a click to get past. `isNamed` is
+ * supplied by the caller; without it the old child-by-child behaviour stands.
  */
-export function expand(tree, collapsed, node, deep) {
+export function expand(tree, collapsed, node, deep, isNamed) {
   collapsed.delete(node);
   if (!deep) {
-    for (const c of tree.children(node)) if (!tree.isTip(c)) collapsed.add(c);
+    for (const c of namedFrontier(tree, node, isNamed)) {
+      if (!tree.isTip(c)) collapsed.add(c);
+    }
     return collapsed;
   }
   const stack = [node];
@@ -89,6 +124,23 @@ export function expand(tree, collapsed, node, deep) {
     for (const c of tree.children(i)) stack.push(c);
   }
   return collapsed;
+}
+
+/**
+ * The nearest named nodes below `node`: its children, except that an unnamed
+ * child is replaced by its own children, and so on down to the tips.
+ */
+export function namedFrontier(tree, node, isNamed) {
+  const out = [];
+  const stack = Array.from(tree.children(node)).reverse();
+  let guard = 0;
+  while (stack.length && guard++ < 100000) {
+    const c = stack.pop();
+    if (tree.isTip(c) || !isNamed || isNamed(c)) { out.push(c); continue; }
+    const kids = tree.children(c);
+    for (let k = kids.length - 1; k >= 0; k--) stack.push(kids[k]);
+  }
+  return out;
 }
 
 export function collapseNode(tree, collapsed, node) {

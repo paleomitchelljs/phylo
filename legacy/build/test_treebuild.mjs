@@ -8,7 +8,7 @@
 import { readFileSync } from 'node:fs';
 import { Tree } from '../docs/js/data.js';
 import {
-  sampleSpread, sampleClose, inducedTopology, cladeKeys, score,
+  sampleSpread, sampleClose, inducedTopology, nodeKeys, score,
   rootedTriple, rootedTripleFull,
 } from '../docs/js/treebuild.js';
 
@@ -118,9 +118,12 @@ console.log(`fossils included: ${withFossils.filter(isExtinct).length} extinct d
 const tips = [...new Set(sampleSpread(tree, 0, 8, { fossils: false, named }, rnd))].slice(0, 8);
 if (tips.length !== 8) fail(`scoring setup dealt ${tips.length} taxa, wanted 8`);
 const ref = inducedTopology(tree, tips);
-if (cladeKeys(ref).size === 0) fail('8-taxon reference has no clades to score against');
+if (nodeKeys(ref).size === 0) fail('8-taxon reference has no nodes to score against');
 const self = score(ref, ref);
-if (self.pct !== 100 || self.rf !== 0) fail(`reference scored against itself: ${self.pct}%, RF ${self.rf}`);
+if (self.pct !== 100) fail(`reference scored against itself: ${self.pct}%`);
+if (self.missed.length || self.spurious.length) {
+  fail(`reference scored against itself: ${self.missed.length} missed, ${self.spurious.length} spurious`);
+}
 
 // A caterpillar in dealt order is almost certainly not the true tree.
 let cat = { tips: [tips[0]], children: null, node: tips[0] };
@@ -129,13 +132,31 @@ for (let i = 1; i < tips.length; i++) {
   cat = { tips: cat.tips.concat([tips[i]]).sort((a, b) => a - b), children: [cat, leaf] };
 }
 const bad = score(cat, ref);
-console.log(`\nreference vs itself: ${self.pct}% (RF ${self.rf})`);
-console.log(`caterpillar vs reference: ${bad.pct}% (RF ${bad.rf}, `
-  + `${bad.correct.length}/${bad.total} clades)`);
-if (bad.total !== cladeKeys(ref).size) fail('clade count mismatch in scoring');
+console.log(`\nreference vs itself: ${self.correct.length}/${self.total} nodes (${self.pct}%)`);
+console.log(`caterpillar vs reference: ${bad.correct.length}/${bad.total} nodes (${bad.pct}%)`);
+if (bad.total !== nodeKeys(ref).size) fail('node count mismatch in scoring');
 if (bad.pct === 100 && bad.total > 0) {
   fail('a caterpillar in dealt order scored 100% -- scoring is not discriminating');
 }
+// The root holds every dealt taxon in any complete tree, so it always counts
+// as recovered -- that is the point of scoring it.
+const allTips = tips.slice().sort((a, b) => a - b).join(',');
+if (!bad.correct.includes(allTips)) fail('the root node did not score as correct');
+
+// The worked example: (((bird, mammal), lizard), shark) against
+// (((bird, lizard), mammal), shark) must be 2 of 3.
+const leaf = (x) => ({ tips: [x], children: null, node: x });
+const clade = (a, b) => ({
+  tips: a.tips.concat(b.tips).sort((x, y) => x - y), children: [a, b],
+});
+const [BIRD, MAMMAL, LIZARD, SHARK] = [1, 2, 3, 4].map(leaf);
+const truth = clade(clade(clade(BIRD, LIZARD), MAMMAL), SHARK);
+const drawn = clade(clade(clade(BIRD, MAMMAL), LIZARD), SHARK);
+const ex = score(drawn, truth);
+if (!(ex.correct.length === 2 && ex.total === 3)) {
+  fail(`worked example scored ${ex.correct.length}/${ex.total}, expected 2/3`);
+}
+console.log(`worked example (amniotes mis-drawn): ${ex.correct.length}/${ex.total} nodes`);
 
 console.log(failures === 0 ? '\nOK' : `\n${failures} failure(s)`);
 process.exit(failures === 0 ? 0 : 1);

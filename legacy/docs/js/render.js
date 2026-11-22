@@ -228,7 +228,9 @@ export class Renderer {
 
       if (!showLabels) continue;
       if (kids.length === 0 || collapsed) {
-        this.drawRowLabel(i, yi, collapsed, c, onPath);
+        // Several tips can share a row. Only the one the layout kept as the
+        // row's node draws the label; the rest are branches converging on it.
+        if (lay.rows[yOf[i]] === i) this.drawRowLabel(i, yi, collapsed, c, onPath, lay);
       } else {
         this.drawInternalLabel(i, xi, yi, c);
       }
@@ -270,7 +272,7 @@ export class Renderer {
     ctx.fillRect(Math.min(xFa, xLa), yi - hh / 2, Math.max(1.5, Math.abs(xLa - xFa)), hh);
   }
 
-  drawRowLabel(i, yi, collapsed, c, onPath) {
+  drawRowLabel(i, yi, collapsed, c, onPath, lay) {
     const { ctx } = this;
     const t = this.tree;
     const x0 = this.plotL + this.plotW + LABEL_GAP + GRADE_GUTTER;
@@ -282,9 +284,12 @@ export class Renderer {
     if (collapsed) {
       const n = t.tipCount[i];
       const named = this.cladeByNode.get(i) || this.taxonByNode.get(i);
-      text = (named ? named.label : text) || 'unnamed clade';
+      text = (named ? named.label : text) || this.borrowedLabel(i);
       if (named && named.nonMono) text += '\u2009*';
       text += `  ${n.toLocaleString()}`;
+    } else if (lay) {
+      const n = lay.dup.get(i);
+      if (n) text += `  ${n}`;
     }
     if (!text) return;
 
@@ -300,6 +305,20 @@ export class Renderer {
       ctx.fillStyle = c.imputedText;
       ctx.fillRect(x0 - 5, yi - 1.5, 3, 3);
     }
+  }
+
+  /**
+   * A caption for a collapsed node that has no name of its own. Expanding never
+   * stops on one of these, but a reader can still shut one by clicking its
+   * branch, and "unnamed clade" tells them nothing about where they are.
+   */
+  borrowedLabel(i) {
+    const t = this.tree;
+    for (let p = t.parent(i); p !== -1; p = t.parent(p)) {
+      const nd = this.cladeByNode.get(p) || this.taxonByNode.get(p);
+      if (nd && nd.label) return `part of ${nd.label}`;
+    }
+    return 'unnamed group';
   }
 
   drawInternalLabel(i, xi, yi, c) {

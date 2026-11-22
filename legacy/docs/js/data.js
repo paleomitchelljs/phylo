@@ -6,6 +6,12 @@
 // backbone and leaves the other 133,000 alone. Clearing the overlay is one
 // Map.clear() rather than a rebuild.
 
+// Epithets that name no species. Title et al.'s taxon-complete squamate tree
+// writes 3,872 of its taxonomy-placed tips as Anolis_xzx90, and several other
+// source trees carry a bare `sp` or `cf`. Rendered literally these read as
+// binomials, which is the one thing they are not.
+const NO_SPECIES = /^(?:xzx\d*|spp?\.?\d*|cf|aff|indet|unknown)\.?$/i;
+
 export const FLAG_EXTINCT = 1;
 export const FLAG_IMPUTED = 2;
 export const FLAG_SCHEMATIC = 4;
@@ -55,10 +61,24 @@ export class Tree {
     return s;
   }
 
-  /** Display form: `Gambusia marshi`, not `Gambusia_marshi`. */
+  /**
+   * Display form: `Gambusia marshi`, not `Gambusia_marshi`, and `Anolis sp.`
+   * rather than `Anolis xzx90`.
+   *
+   * A placeholder only counts as one when nothing that looks like an epithet
+   * follows it: `Eptatretus cf. fernholmi` does name a species and stays as it
+   * is, while `Cyclemys sp CAS208423` is a voucher and becomes `Cyclemys sp.
+   * CAS208423`, which keeps the two Cyclemys tips apart.
+   */
   label(i) {
     const s = this.name(i);
-    return s.indexOf('_') === -1 ? s : s.replace(/_/g, ' ');
+    if (s.indexOf('_') === -1) return s;
+    const parts = s.split('_');
+    if (parts.length > 1 && NO_SPECIES.test(parts[1])
+        && !parts.slice(2).some(isEpithet)) {
+      parts[1] = 'sp.';
+    }
+    return parts.join(' ');
   }
 
   // ---- base children as CSR ---------------------------------------------
@@ -125,6 +145,36 @@ export class Tree {
 
   isTip(i) { return this.children(i).length === 0; }
 
+  /**
+   * An integer per node such that two tips print the same row iff their ids
+   * match, and -1 for anything that must never be merged away.
+   *
+   * The layout uses this to fold runs of adjacent identical rows into one, and
+   * it runs over every visible row on every relayout, so the comparison has to
+   * be an array read rather than a string build. Paid for once, lazily: the
+   * pass costs about 30 ms and warms the name cache the renderer needs anyway.
+   *
+   * Extinct tips are excluded. They carry their own stratigraphic range and are
+   * few enough to read individually, and it is the one case where two rows can
+   * share a label and mean different things -- the Upham tree has a living
+   * Hydrodamalis gigas where the scaffold has the fossil.
+   */
+  rowKeys() {
+    if (this._rowKey) return this._rowKey;
+    const k = new Int32Array(this.cap).fill(-1);
+    const ids = new Map();
+    for (let i = 0; i < this.n; i++) {
+      if (this.childStart[i] !== this.childStart[i + 1]) continue;
+      if (this.flags[i] & FLAG_EXTINCT) continue;
+      const s = `${this.label(i)}\u0001${this.flags[i] & FLAG_IMPUTED}`;
+      let id = ids.get(s);
+      if (id === undefined) { id = ids.size; ids.set(s, id); }
+      k[i] = id;
+    }
+    this._rowKey = k;
+    return k;
+  }
+
   // ---- derived -----------------------------------------------------------
 
   /** Tips below every node, and the youngest age reached, for collapsed clades. */
@@ -183,6 +233,10 @@ export class Tree {
 }
 
 const EMPTY = new Int32Array(0);
+function isEpithet(s) {
+  return /^[a-z]+$/.test(s);
+}
+
 function pad4(x) { return x + ((-x) % 4 + 4) % 4; }
 
 export async function loadTree(base = 'data/') {
@@ -234,7 +288,7 @@ export function buildSearchIndex(tree) {
     if (tree.childStart[i] !== tree.childStart[i + 1]) continue;
     if (seen.has(i)) continue;
     const nm = tree.name(i);
-    if (nm) push(i, nm.replace(/_/g, ' '), 'species', commonByNode.get(i));
+    if (nm) push(i, tree.label(i), 'species', commonByNode.get(i));
   }
 
   return {

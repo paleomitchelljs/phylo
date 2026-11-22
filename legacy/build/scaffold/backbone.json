@@ -257,10 +257,19 @@
     {
       "graftAt": "Testudines",
       "file": "testudines/thomson2021/bd.mcc.median_heights.tre",
-      "dropPattern": "^(Homo|Gallus|Alligator|Anolis|Crocodylus|Sphenodon)_",
+      "dropPattern": "^(AA|ZZ|Homo|Gallus|Ggallus|Alligator|Anolis|Crocodylus|Sphenodon)_",
+      "tipNames": "binomial",
+      "rename": {
+        "Elseya_Sth_Alligator_213": "Elseya_sp",
+        "Hompous_areolatus": "Homopus_areolatus",
+        "Hompous_boulengeri": "Homopus_boulengeri",
+        "Hompous_signatus": "Homopus_signatus",
+        "Eretmocelys_imbricata": "Eretmochelys_imbricata"
+      },
+      "noteInternal": "Outgroups in this file are prefixed AA_ (AA_Alligator, AA_Ggallus) and every tip carries a museum voucher, so both have to be handled here or turtles end up with an alligator in them.",
       "citation": "Thomson et al. 2021 PNAS 118:e2012215118",
       "doi": "10.1073/pnas.2012215118",
-      "note": "279 of 357 living species. Not taxon-complete."
+      "note": "286 tips for 279 of the 357 living species, subspecies and undescribed forms included. Not taxon-complete."
     },
     {
       "graftAt": "Aves",
@@ -353,7 +362,20 @@
       "mrca": [
         "Canis_lupus",
         "Bos_taurus",
-        "Myotis_lucifugus"
+        "Myotis_lucifugus",
+        "Sorex_araneus",
+        "Erinaceus_europaeus"
+      ]
+    },
+    {
+      "label": "Theria",
+      "vernacular": "marsupials and placentals",
+      "mrca": [
+        "Didelphis_virginiana",
+        "Macropus_giganteus",
+        "Caenolestes_fuliginosus",
+        "Homo_sapiens",
+        "Loxodonta_africana"
       ]
     },
     {
@@ -362,7 +384,8 @@
       "mrca": [
         "Didelphis_virginiana",
         "Phascolarctos_cinereus",
-        "Macropus_giganteus"
+        "Macropus_giganteus",
+        "Caenolestes_fuliginosus"
       ]
     },
     {
@@ -400,7 +423,9 @@
       "mrca": [
         "Passer_domesticus",
         "Columba_livia",
-        "Falco_peregrinus"
+        "Falco_peregrinus",
+        "Phoenicopterus_roseus",
+        "Podiceps_cristatus"
       ]
     },
     {
@@ -409,7 +434,9 @@
       "mrca": [
         "Python_regius",
         "Crotalus_atrox",
-        "Natrix_natrix"
+        "Natrix_natrix",
+        "Anilius_scytale",
+        "Typhlops_pusillus"
       ]
     },
     {
@@ -425,7 +452,10 @@
       "vernacular": "geckos",
       "mrca": [
         "Gekko_gecko",
-        "Hemidactylus_frenatus"
+        "Hemidactylus_frenatus",
+        "Eublepharis_macularius",
+        "Phyllodactylus_kofordi",
+        "Sphaerodactylus_lineolatus"
       ]
     },
     {
@@ -457,7 +487,11 @@
       "mrca": [
         "Xenopus_laevis",
         "Rana_temporaria",
-        "Bufo_bufo"
+        "Bufo_bufo",
+        "Ascaphus_truei",
+        "Leiopelma_hochstetteri",
+        "Bombina_bombina",
+        "Alytes_obstetricans"
       ]
     },
     {
@@ -524,7 +558,11 @@
       "mrca": [
         "Danio_rerio",
         "Gadus_morhua",
-        "Thunnus_thynnus"
+        "Thunnus_thynnus",
+        "Osteoglossum_bicirrhosum",
+        "Hiodon_alosoides",
+        "Anguilla_anguilla",
+        "Elops_saurus"
       ]
     },
     {
@@ -533,7 +571,11 @@
       "mrca": [
         "Gasterosteus_aculeatus",
         "Thunnus_thynnus",
-        "Oryzias_latipes"
+        "Oryzias_latipes",
+        "Gadus_morhua",
+        "Polymixia_berndti",
+        "Lampris_guttatus",
+        "Percopsis_omiscomaycus"
       ]
     },
     {
@@ -550,7 +592,9 @@
       "mrca": [
         "Chelonia_mydas",
         "Chelydra_serpentina",
-        "Testudo_graeca"
+        "Testudo_graeca",
+        "Apalone_spinifera",
+        "Carettochelys_insculpta"
       ]
     },
     {
@@ -558,8 +602,66 @@
       "vernacular": "side-necked turtles",
       "mrca": [
         "Podocnemis_expansa",
-        "Chelodina_longicollis"
+        "Chelodina_longicollis",
+        "Pelusios_adansonii"
       ]
+    },
+    {
+      "label": "Trionychia",
+      "vernacular": "softshells and the pig-nosed turtle",
+      "mrca": ["Apalone_spinifera", "Carettochelys_insculpta"]
+    },
+    {
+      "label": "Trionychidae",
+      "vernacular": "softshell turtles",
+      "mrca": ["Apalone_spinifera", "Lissemys_punctata", "Pelodiscus_sinensis"]
+    },
+    {
+      "label": "Chelonioidea",
+      "vernacular": "sea turtles",
+      "mrca": ["Chelonia_mydas", "Dermochelys_coriacea", "Caretta_caretta"]
+    },
+    {
+      "label": "Chelydridae",
+      "vernacular": "snapping turtles",
+      "mrca": ["Chelydra_serpentina", "Macrochelys_temminckii"]
+    },
+    {
+      "label": "Kinosternidae",
+      "vernacular": "mud and musk turtles",
+      "mrca": ["Kinosternon_baurii", "Sternotherus_carinatus",
+               "Claudius_angustatus", "Staurotypus_salvinii"]
+    },
+    {
+      "label": "Testudinidae",
+      "vernacular": "tortoises",
+      "mrca": ["Testudo_graeca", "Gopherus_agassizii", "Chelonoidis_carbonaria"]
+    },
+    {
+      "label": "Emydidae",
+      "vernacular": "pond and box turtles",
+      "mrca": ["Trachemys_adiutrix", "Terrapene_carolina", "Emys_orbicularis"]
+    },
+    {
+      "label": "Geoemydidae",
+      "vernacular": "Asian pond turtles",
+      "mrca": ["Cuora_amboinensis", "Mauremys_caspica", "Rhinoclemmys_annulata",
+               "Siebenrockiella_crassicollis", "Batagur_baska", "Geoclemys_hamiltonii"]
+    },
+    {
+      "label": "Chelidae",
+      "vernacular": "Austro-South American side-necks",
+      "mrca": ["Chelodina_longicollis", "Phrynops_geoffroanus", "Chelus_fimbriatus"]
+    },
+    {
+      "label": "Pelomedusidae",
+      "vernacular": "African side-necks",
+      "mrca": ["Pelusios_adansonii", "Pelomedusa_ssubrufa"]
+    },
+    {
+      "label": "Podocnemididae",
+      "vernacular": "river turtles",
+      "mrca": ["Podocnemis_expansa", "Peltocephalus_dumerilianus"]
     },
     {
       "label": "Alligatoridae",

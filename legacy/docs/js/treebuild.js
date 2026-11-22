@@ -162,32 +162,39 @@ export function inducedTopology(tree, tipIds) {
   return build(root);
 }
 
-/** Non-trivial clades of a rooted topology, as sorted comma-joined keys. */
-export function cladeKeys(topo) {
+/**
+ * Every internal node of a rooted topology, keyed by the set of tips below it.
+ *
+ * The root is included, unlike the Robinson-Foulds convention. A student who
+ * draws all the dealt taxa in one tree has the root group right by
+ * construction, and that node is a real claim about the world -- these taxa
+ * share an ancestor not shared with anything else -- so it is scored like any
+ * other. Getting the outgroup wrong costs the nodes it breaks, not the root.
+ */
+export function nodeKeys(topo) {
   const out = new Set();
-  const total = topo.tips.length;
   const walk = (u) => {
     if (!u.children) return;
-    if (u.tips.length > 1 && u.tips.length < total) {
-      out.add(u.tips.slice().sort((a, b) => a - b).join(','));
-    }
+    out.add(u.tips.slice().sort((a, b) => a - b).join(','));
     u.children.forEach(walk);
   };
   walk(topo);
   return out;
 }
 
-/** Compare a student topology to the reference. */
+/**
+ * Compare a student topology to the reference: how many reference nodes have
+ * exactly the right set of descendants, out of every node in the reference.
+ */
 export function score(studentTopo, referenceTopo) {
-  const ref = cladeKeys(referenceTopo);
-  const got = cladeKeys(studentTopo);
+  const ref = nodeKeys(referenceTopo);
+  const got = nodeKeys(studentTopo);
   const correct = [...got].filter((k) => ref.has(k));
   const missed = [...ref].filter((k) => !got.has(k));
   const spurious = [...got].filter((k) => !ref.has(k));
   return {
     ref, got, correct, missed, spurious,
     total: ref.size,
-    rf: missed.length + spurious.length,
     pct: ref.size ? Math.round((correct.length / ref.size) * 100) : 100,
   };
 }

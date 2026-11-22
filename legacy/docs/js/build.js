@@ -7,10 +7,12 @@
 // and the clade becomes a thing you can join. That is what a tree is -- nested
 // sets -- and dragging labels into a pretty shape without that constraint lets
 // a student produce a picture they cannot defend.
+//
+// Scoring is node-by-node: see nodeKeys() in treebuild.js.
 
 import { loadTree, FLAG_EXTINCT } from './data.js';
 import { shuffle, tipsUnder, sampleSpread, sampleClose, inducedTopology,
-         cladeKeys, score } from './treebuild.js';
+         score } from './treebuild.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -122,10 +124,6 @@ function deal() {
   $('results').hidden = true;
   render();
 }
-
-// --------------------------------------------------------------------------
-// The published answer, pruned to the dealt taxa
-// --------------------------------------------------------------------------
 
 // --------------------------------------------------------------------------
 // Units on the bench
@@ -246,8 +244,8 @@ function render() {
   const done = state.units.length === 1 && state.units[0].tips.length === state.taxa.length;
   $('check').disabled = !done || state.taxa.length < 3;
   $('progress').textContent = state.units.length === 1
-    ? (state.taxa.length < 3 ? 'Too few taxa to have a wrong answer.' : 'One tree. Ready to check.')
-    : `${state.units.length} groups left to join`;
+    ? (state.taxa.length < 3 ? '' : 'Ready to check')
+    : `${state.units.length} cards left`;
   $('hintbar').hidden = state.units.length === 1;
 }
 
@@ -381,7 +379,7 @@ function wire() {
 function check() {
   const student = state.units[0];
   const s = score(student, state.reference);
-  const { ref, correct, missed, spurious, rf, pct } = s;
+  const { ref, correct, missed, spurious, pct } = s;
   state.checked = true;
 
   const clean = (key) => key.split(',').map((id) => {
@@ -401,31 +399,27 @@ function check() {
   };
 
   const rows = [];
-  rows.push(`<p class="score"><strong>${correct.length} of ${s.total}</strong>
-    clades in the published tree recovered (${pct}%).
-    Robinson&ndash;Foulds distance ${rf}.</p>`);
+  rows.push(`<p class="score"><strong>${correct.length} / ${s.total}</strong>
+    nodes correct (${pct}%)</p>`);
 
   if (missed.length) {
-    rows.push('<h3>Groups you did not recover</h3><ul class="cladelist">'
+    rows.push('<h3>Missed</h3><ul class="cladelist">'
       + missed.map((k) => `<li>${describe(k, true)}</li>`).join('')
       + '</ul>');
   }
   if (spurious.length) {
-    rows.push('<h3>Groups you made that the tree does not support</h3><ul class="cladelist">'
+    rows.push('<h3>Not in the tree</h3><ul class="cladelist">'
       + spurious.map((k) => `<li>${describe(k, false)}</li>`).join('')
       + '</ul>');
   }
   if (!missed.length && !spurious.length) {
-    rows.push('<p class="perfect">Exactly the published topology.</p>');
+    rows.push('<p class="perfect">Every node right.</p>');
   }
 
   rows.push(`<div class="compare">
       <figure><figcaption>Your tree</figcaption>${svgFor(student, ref)}</figure>
       <figure><figcaption>The published tree</figcaption>${svgFor(toUnit(state.reference))}</figure>
     </div>`);
-  rows.push(`<p class="caveat">Scored against the reference topology in
-    <a href="index.html">the explorer</a>, pruned to these taxa. Several of these
-    nodes are genuinely contested; the explorer's toggles show which.</p>`);
 
   $('results').innerHTML = rows.join('');
   $('results').hidden = false;
@@ -434,9 +428,7 @@ function check() {
 
 function reveal() {
   $('results').innerHTML =
-    `<h3>The published tree</h3>${svgFor(toUnit(state.reference))}
-     <p class="caveat">Pruned from the reference topology in
-     <a href="index.html">the explorer</a>.</p>`;
+    `<h3>The published tree</h3>${svgFor(toUnit(state.reference))}`;
   $('results').hidden = false;
 }
 

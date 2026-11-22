@@ -2,87 +2,99 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<title>Vertebrate Tree Explorer</title>
-<meta name="description" content="An interactive, time-calibrated tree of living and extinct vertebrates: 68,000 species, fossil lineages and paraphyletic grades, with the contested nodes switchable.">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tree Practice</title>
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
+<header class="bar">
+  <button class="ic" id="b-pool" title="Tips">
+    <svg viewBox="0 0 20 20"><path d="M3 5h14M3 10h14M3 15h14"/></svg></button>
+  <div class="brand"><svg viewBox="0 0 20 20"><path d="M10 18V11M10 11L4 3M10 11l6-8M7 7l3-4"/></svg></div>
+  <select id="deck" title="Tip set"></select>
+  <div class="grp" id="dealer">
+    <select id="scope" title="Deal from"></select>
+    <select id="count" title="How many"><option>6</option><option selected>11</option><option>16</option><option>21</option></select>
+    <button class="ic" id="b-fos" title="Include fossils">†</button>
+    <button class="ic" id="b-deal" title="Deal random tips">
+      <svg viewBox="0 0 20 20"><rect x="3" y="3" width="14" height="14" rx="3"/><circle cx="7" cy="7" r="1.2" class="f"/><circle cx="13" cy="13" r="1.2" class="f"/><circle cx="13" cy="7" r="1.2" class="f"/><circle cx="7" cy="13" r="1.2" class="f"/></svg></button>
+  </div>
+  <span class="sp"></span>
+  <button class="ic" id="b-undo" title="Undo (⌘Z)"><svg viewBox="0 0 20 20"><path d="M7 5L3 9l4 4M3 9h9a5 5 0 010 10h-2"/></svg></button>
+  <button class="ic" id="b-redo" title="Redo (⇧⌘Z)"><svg viewBox="0 0 20 20"><path d="M13 5l4 4-4 4M17 9H8a5 5 0 000 10h2"/></svg></button>
+  <button class="ic" id="b-tidy" title="Tidy and fit"><svg viewBox="0 0 20 20"><path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4"/></svg></button>
+  <button class="ic" id="b-style" title="Square / slanted branches"><svg viewBox="0 0 20 20"><path d="M4 4v6h12V4M10 10v7"/></svg></button>
+  <button class="ic" id="b-clear" title="Clear tree"><svg viewBox="0 0 20 20"><path d="M4 6h12M8 6V4h4v2M6 6l1 11h6l1-11"/></svg></button>
+  <span class="div"></span>
+  <button class="ic tog" id="b-check" title="Check"><svg viewBox="0 0 20 20"><path d="M4 10l4 4 8-9"/></svg></button>
+  <span id="score"></span>
+  <button class="ic tog" id="b-answer" title="Answer"><svg viewBox="0 0 20 20"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6z"/><circle cx="10" cy="10" r="2.5"/></svg></button>
+  <button class="ic" id="b-traits" title="Traits"><svg viewBox="0 0 20 20"><path d="M4 16l3-1 9-9-2-2-9 9-1 3z"/></svg></button>
+  <button class="ic" id="b-help" title="Help">?</button>
+</header>
 
-<div id="app" class="app">
-
-  <header class="topbar">
-    <button id="menuBtn" class="icon-btn" aria-label="Show controls" aria-expanded="false">&#9776;</button>
-    <h1>Vertebrate Tree Explorer</h1>
-    <p id="stats" class="stats" aria-live="polite"></p>
-    <div class="spacer"></div>
-    <div class="toolgroup" role="group" aria-label="View controls">
-      <button id="btnZoomOut" class="tool" title="Shorter rows">&minus;</button>
-      <button id="btnZoomIn" class="tool" title="Taller rows">+</button>
-      <button id="btnFitTime" class="tool" title="Show the whole time axis">Fit time</button>
-      <button id="btnReset" class="tool" title="Back to the starting view">Reset</button>
-      <a class="tool" href="build.html" title="Group species into a tree and score it">Build a tree &rarr;</a>
-    </div>
-  </header>
-
-  <aside id="sidebar" class="sidebar" aria-label="Controls">
-
-    <section class="panel">
-      <label class="field">
-        <span class="field-label">Find a species or clade</span>
-        <input id="search" type="search" placeholder="Tiktaalik, sperm whale, Colubridae&hellip;"
-               autocomplete="off" spellcheck="false">
-      </label>
-      <ul id="results" class="results" hidden></ul>
-    </section>
-
-    <section id="detail" class="panel detail" hidden></section>
-
-    <section class="panel">
-      <h2 class="panel-h">Contested nodes</h2>
-      <p class="panel-note">Switch a node and the tree rearranges. Ages are not
-        re-estimated under the alternative, so rearranged branches are drawn dashed.</p>
-      <div id="alternatives" class="alts"></div>
-    </section>
-
-    <section class="panel">
-      <h2 class="panel-h">Grades</h2>
-      <p class="panel-note">Paraphyletic groups &mdash; the ones that are not clades.
-        Tick one to mark its lineages in the gutter beside the tree.</p>
-      <div id="grades" class="grades"></div>
-    </section>
-
-    <section class="panel">
-      <h2 class="panel-h">Display</h2>
-      <label class="check"><input type="checkbox" id="optImputed" checked>
-        <span>Mark species placed by taxonomy</span></label>
-      <label class="check"><input type="checkbox" id="optExtinct" checked>
-        <span>Show extinct lineages</span></label>
-      <div class="legend" id="legend"></div>
-    </section>
-
-    <section class="panel">
-      <h2 class="panel-h">Sources</h2>
-      <ul id="sources" class="sources"></ul>
-      <p class="panel-note" id="buildinfo"></p>
-    </section>
-
+<main>
+  <aside id="pool">
+    <div id="chips"></div>
+    <input id="add" list="taxa" placeholder="+" title="Add a tip">
   </aside>
 
-  <main class="stage">
-    <canvas id="canvas" tabindex="0" aria-label="Vertebrate phylogeny"></canvas>
-    <div id="tooltip" class="tooltip" hidden></div>
-    <div id="loading" class="loading">Loading the tree&hellip;</div>
-    <p class="hint" id="hint">Click a triangle to open it &middot; scroll to move &middot;
-      shift&#8209;scroll to zoom time</p>
-  </main>
+  <section id="stage">
+    <svg id="cv"><g id="world"></g></svg>
+    <div id="empty">
+      <svg viewBox="0 0 120 70"><path d="M30 10v30h60V10M60 40v22" /><path d="M20 4l10 6 10-6M80 4l10 6 10-6" class="dim"/></svg>
+    </div>
+    <div id="tools" hidden>
+      <button data-a="label" title="Name (Enter)"><svg viewBox="0 0 20 20"><path d="M4 5h12M10 5v11"/></svg></button>
+      <button data-a="rotate" title="Swap (R)"><svg viewBox="0 0 20 20"><path d="M4 8h12l-3-3M16 12H4l3 3"/></svg></button>
+      <button data-a="split" title="Add slot (S)"><svg viewBox="0 0 20 20"><path d="M10 4v12M4 10h12"/></svg></button>
+      <button data-a="collapse" title="Collapse (C)"><svg viewBox="0 0 20 20"><path d="M5 5l5 6 5-6M10 11v5"/></svg></button>
+      <button data-a="remove" title="Remove (Del)"><svg viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15"/></svg></button>
+    </div>
+    <input id="labeler" list="clades" hidden autocomplete="off" spellcheck="false">
+    <div id="zoom">
+      <button class="ic" id="z-in" title="Zoom in">+</button>
+      <button class="ic" id="z-out" title="Zoom out">−</button>
+    </div>
+    <div id="dragchip" hidden></div>
+  </section>
 
+  <aside id="traits">
+    <input id="tfilter" placeholder="filter" spellcheck="false">
+    <div id="tlist"></div>
+    <input id="tnew" placeholder="+" title="Add your own trait" spellcheck="false">
+  </aside>
+</main>
+
+<div id="answer" hidden>
+  <svg id="ans"></svg>
+  <div class="alts" id="alts"></div>
 </div>
 
-<script type="module" src="js/app.js"></script>
-<noscript>
-  <p style="padding:2rem;font:16px system-ui">This explorer needs JavaScript.
-  The underlying trees and the build pipeline are in the repository.</p>
-</noscript>
+<div id="help" hidden>
+  <div class="card">
+    <dl>
+      <dt><span class="k">drag</span> tip → canvas</dt><dd>place</dd>
+      <dt><span class="k">drop</span> on a node</dt><dd>sisters</dd>
+      <dt><span class="k">⇧ drop</span> on a node</dt><dd>into polytomy</dd>
+      <dt><span class="k">drop</span> on <span class="ph">?</span></dt><dd>fill slot</dd>
+      <dt><span class="k">drag</span> out of a tree</dt><dd>detach</dd>
+      <dt><span class="k">drop</span> on tip list</dt><dd>remove</dd>
+      <dt><span class="k">double-click</span> canvas</dt><dd>new node with two slots</dd>
+      <dt><span class="k">double-click</span> node</dt><dd>name it</dd>
+      <dt><span class="k">trait</span> + click branch</dt><dd>gain · ⇧ loss</dd>
+      <dt><span class="k">R S C Del</span></dt><dd>swap · slot · collapse · remove</dd>
+      <dt><span class="k">⌘Z</span></dt><dd>undo</dd>
+    </dl>
+    <div class="legend"><i class="ok"></i>in the course tree <i class="meh"></i>not tested <i class="bad"></i>conflicts</div>
+  </div>
+</div>
+
+<datalist id="clades"></datalist>
+<datalist id="taxa"></datalist>
+
+<script src="js/course.js"></script>
+<script src="js/tree.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>
